@@ -1,0 +1,77 @@
+# User Session Data - Should not be committed
+# =============================================
+
+# User workspaces (where users actually do exercises)
+user-workspace/
+workspaces/
+*-workspace/
+
+# Terraform state and lock files (user-specific)
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+*.tfplan
+tfplan
+
+# Terraform directories
+**/.terraform/*
+
+# User progress and configuration
+*.progress.json
+*.config.json
+.lab-progress/
+.lab-config/
+
+# Local environment files
+.env
+.env.local
+*.local.tfvars
+terraform.tfvars
+
+# User-specific output
+terraform-lab-output/
+output/
+test-output/
+
+# Logs
+*.log
+logs/
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Windows specific
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# PowerShell session data
+*.ps1.credentials
+*.ps1.session
+
+# Certificates and secrets (user-generated)
+*.pem
+*.key
+*.crt
+*.pfx
+secrets/
+
+# User notes
+notes.md
+personal-notes.md
+my-notes.txt
+
+# But DO track these:
+!exercises/**/.gitkeep
+!examples/**/*
+!scripts/**/*
+!*.example.tfvars

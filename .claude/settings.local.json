@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(kubectl version:*)",
+      "Bash(minikube status:*)",
+      "Bash(docker version:*)",
+      "Bash(helm version:*)",
+      "Bash(mkdir:*)",
+      "Bash(powershell:*)",
+      "Bash(terraform:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
