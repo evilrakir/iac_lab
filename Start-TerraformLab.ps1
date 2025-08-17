@@ -335,9 +335,9 @@ function Start-Exercise {
         $allMet = $true
         foreach ($prereq in $exercise.Prerequisites) {
             if ($script:Progress.Exercises[$prereq].Status -eq "Completed") {
-                Write-Host "   ✅ $prereq" -ForegroundColor Green
+                Write-Host "   [OK] $prereq" -ForegroundColor Green
             } else {
-                Write-Host "   ❌ $prereq (not completed)" -ForegroundColor Red
+                Write-Host "   [X] $prereq (not completed)" -ForegroundColor Red
                 $allMet = $false
             }
         }
@@ -546,7 +546,7 @@ function Show-Hint {
 function Show-CommonErrors {
     param([string]$ExerciseId)
     
-    Write-Host "`n⚠️  COMMON ERRORS & SOLUTIONS:" -ForegroundColor Yellow
+    Write-Host "`n[!] COMMON ERRORS AND SOLUTIONS:" -ForegroundColor Yellow
     Write-Host ""
     
     $commonErrors = @{
@@ -575,8 +575,8 @@ function Show-CommonErrors {
     foreach ($category in $commonErrors.GetEnumerator()) {
         Write-Host "  $($category.Key):" -ForegroundColor Cyan
         foreach ($error in $category.Value.GetEnumerator()) {
-            Write-Host "    ❌ $($error.Key)" -ForegroundColor Red
-            Write-Host "    ✅ $($error.Value)" -ForegroundColor Green
+            Write-Host "    [X] $($error.Key)" -ForegroundColor Red
+            Write-Host "    [OK] $($error.Value)" -ForegroundColor Green
             Write-Host ""
         }
     }
