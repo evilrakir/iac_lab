@@ -6,7 +6,7 @@
 # Basic string output
 output "lab_directory_path" {
   description = "Path to the created lab directory"
-  value       = local_directory.lab_directory.path
+  value       = var.lab_path
 }
 
 # Output with sensitive data (like PowerShell SecureString)
@@ -36,7 +36,7 @@ output "backup_status" {
 output "lab_summary" {
   description = "Summary of the lab configuration"
   value = {
-    directory_path = local_directory.lab_directory.path
+    directory_path = var.lab_path
     student_name   = var.student_name
     environment    = var.environment
     file_count     = var.file_count
@@ -55,7 +55,7 @@ output "lab_info_formatted" {
     ========================================
     Student: ${var.student_name}
     Environment: ${var.environment}
-    Lab Path: ${local_directory.lab_directory.path}
+    Lab Path: ${var.lab_path}
     Files Created: ${length([
       local_file.welcome_file.filename,
       local_file.terraform_concepts_ps1.filename,
@@ -71,9 +71,9 @@ output "lab_info_formatted" {
 output "file_sizes" {
   description = "Size of created files (in bytes)"
   value = {
-    welcome_file = local_file.welcome_file.content_length
-    concepts_script = local_file.terraform_concepts_ps1.content_length
-    example_config = local_file.terraform_example_tf.content_length
+    welcome_file = length(local_file.welcome_file.content)
+    concepts_script = length(local_file.terraform_concepts_ps1.content)
+    example_config = length(local_file.terraform_example_tf.content)
   }
 }
 
@@ -87,7 +87,7 @@ output "creation_time" {
 output "lab_validation" {
   description = "Validation status of the lab"
   value = {
-    directory_exists = local_directory.lab_directory.path != null
+    directory_exists = var.lab_path != null
     files_created    = length([
       local_file.welcome_file.filename,
       local_file.terraform_concepts_ps1.filename,

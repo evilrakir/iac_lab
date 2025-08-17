@@ -3,6 +3,13 @@
 # This file demonstrates how to define variables in Terraform.
 # Variables are similar to PowerShell parameters but with more structure.
 
+# Project name variable (needed for terraform_example_tf resource)
+variable "project_name" {
+  description = "Name of the project"
+  type        = string
+  default     = "terraform-lab"
+}
+
 # Basic string variable with default value
 variable "lab_path" {
   description = "Path where the lab files will be created"

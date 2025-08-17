@@ -15,14 +15,10 @@ terraform {
   required_version = ">= 1.0"
 }
 
-# Create a local directory for our lab
-resource "local_directory" "lab_directory" {
-  path = var.lab_path
-}
-
 # Create a simple text file with a welcome message
+# Note: local_file automatically creates parent directories
 resource "local_file" "welcome_file" {
-  filename = "${local_directory.lab_directory.path}/welcome.txt"
+  filename = "${var.lab_path}/welcome.txt"
   content  = <<-EOT
     Welcome to Terraform Learning Lab!
     
@@ -42,12 +38,12 @@ resource "local_file" "welcome_file" {
     Happy Terraforming! 🌍
   EOT
 
-  depends_on = [local_directory.lab_directory]
+  # Directory is created automatically with the file
 }
 
 # Create a PowerShell script that demonstrates Terraform concepts
 resource "local_file" "terraform_concepts_ps1" {
-  filename = "${local_directory.lab_directory.path}/terraform-concepts.ps1"
+  filename = "${var.lab_path}/terraform-concepts.ps1"
   content  = <<-EOT
 # PowerShell script demonstrating Terraform concepts
 # This script shows how PowerShell and Terraform concepts relate
@@ -105,12 +101,12 @@ Write-Host "Terraform: terraform plan for preview" -ForegroundColor Yellow
 Write-Host "`nYour PowerShell skills will help you learn Terraform quickly!" -ForegroundColor Green
   EOT
 
-  depends_on = [local_directory.lab_directory]
+  # Directory is created automatically with the file
 }
 
 # Create a configuration file that shows Terraform syntax
 resource "local_file" "terraform_example_tf" {
-  filename = "${local_directory.lab_directory.path}/example.tf"
+  filename = "${var.lab_path}/example.tf"
   content  = <<-EOT
 # Example Terraform configuration
 # This shows the basic structure of a Terraform file
@@ -176,5 +172,5 @@ output "project_info" {
 }
   EOT
 
-  depends_on = [local_directory.lab_directory]
+  # Directory is created automatically with the file
 }
