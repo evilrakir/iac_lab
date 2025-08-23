@@ -105,3 +105,4 @@ After completing this exercise:
 ---
 
 **Ready to combine PowerShell and Terraform! ⚡**
+

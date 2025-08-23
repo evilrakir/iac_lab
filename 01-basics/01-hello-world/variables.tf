@@ -94,3 +94,4 @@ variable "lab_config" {
     enabled     = true
   }
 }
+

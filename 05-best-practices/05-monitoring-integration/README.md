@@ -106,3 +106,4 @@ After completing this exercise:
 ---
 
 **Ready to automate your monitoring infrastructure! 📊**
+

@@ -174,3 +174,4 @@ output "project_info" {
 
   # Directory is created automatically with the file
 }
+

@@ -61,6 +61,31 @@ $script:Exercises = @{
         Description = "Deep dive into Terraform providers and configuration"
         Prerequisites = @("01-basics/05-resources")
     }
+    "03-openstack/01-provider-setup" = @{
+        Name = "OpenStack Provider Configuration"
+        Description = "Configure OpenStack provider and test cloud connectivity"
+        Prerequisites = @("02-providers/01-local-provider")
+    }
+    "03-openstack/02-basic-vm" = @{
+        Name = "OpenStack Virtual Machine Deployment"
+        Description = "Deploy your first VM with security groups and SSH access"
+        Prerequisites = @("03-openstack/01-provider-setup")
+    }
+    "03-openstack/03-networking" = @{
+        Name = "Advanced Networking and Security Groups"
+        Description = "Create multi-tier network architecture with bastion host"
+        Prerequisites = @("03-openstack/02-basic-vm")
+    }
+    "03-openstack/04-storage" = @{
+        Name = "Storage and Volume Management"
+        Description = "Implement persistent storage with monitoring and backups"
+        Prerequisites = @("03-openstack/03-networking")
+    }
+    "03-openstack/05-load-balancer" = @{
+        Name = "Load Balancers and High Availability"
+        Description = "Configure load balancing and health checks for web applications"
+        Prerequisites = @("03-openstack/04-storage")
+    }
 }
 
 # Helper Functions

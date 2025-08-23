@@ -103,3 +103,4 @@ After completing this exercise:
 ---
 
 **Ready to manage Windows infrastructure with Terraform! 🪟**
+
