@@ -283,6 +283,17 @@ function Start-Exercise {
     if (Test-Path "$exercisePath\terraform.tfvars") {
         Copy-Item "$exercisePath\terraform.tfvars" -Destination $workspacePath
     }
+    # Copy template files
+    Get-ChildItem $exercisePath -File -Filter "*.tftpl" | ForEach-Object {
+        Copy-Item $_.FullName -Destination $workspacePath
+    }
+    # Copy any other configuration files
+    Get-ChildItem $exercisePath -File -Filter "*.yaml" | ForEach-Object {
+        Copy-Item $_.FullName -Destination $workspacePath
+    }
+    Get-ChildItem $exercisePath -File -Filter "*.yml" | ForEach-Object {
+        Copy-Item $_.FullName -Destination $workspacePath
+    }
     
     Show-Header $exercise.Name $exercise.Description
     
