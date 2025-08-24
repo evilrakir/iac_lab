@@ -227,7 +227,7 @@ resource "local_file" "powershell_comparison" {
         [bool]$EnableMonitoring = $${var.enable_monitoring ? "true" : "false"},
         
         # Array parameter
-        [string[]]$AvailabilityZones = @(${join(", ", formatlist('"%s"', var.availability_zones))}),
+        [string[]]$AvailabilityZones = @(${join(", ", formatlist("\"%s\"", var.availability_zones))}),
         
         # Hashtable parameter (like Terraform map)
         [hashtable]$Tags = @{

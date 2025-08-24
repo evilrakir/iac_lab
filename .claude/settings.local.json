@@ -13,7 +13,9 @@
       "Bash(git push:*)",
       "Bash(del \"C:\\lappyshare\\dev\\lab\\test-syntax.ps1\")",
       "Bash(git checkout:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Read(/C:\\Users\\jefeh\\AppData\\Local\\Temp\\terraform-lab-01-basics-01-hello-world-20250823-232319/**)",
+      "Read(/C:\\Users\\jefeh\\AppData\\Local\\Temp\\terraform-lab-01-basics-01-hello-world-20250823-232319\\terraform-lab-output/**)"
     ],
     "deny": [],
     "ask": []
