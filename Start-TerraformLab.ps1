@@ -31,35 +31,68 @@ $script:Progress = @{
 
 # Exercise definitions
 $script:Exercises = @{
+    # 01-basics - Core Terraform Concepts
     "01-basics/01-hello-world" = @{
         Name = "Hello World - Your First Terraform Configuration"
-        Description = "Learn basic Terraform syntax and create your first resources"
+        Description = "Learn basic Terraform syntax, workflow, and create your first resources"
         Prerequisites = @()
+        Difficulty = "Beginner"
     }
     "01-basics/02-variables" = @{
-        Name = "Variables and Data Types"
-        Description = "Learn how to use variables and data types in Terraform"
+        Name = "Variables and Input Values - All Types"
+        Description = "Master all variable types, validation, locals, and precedence"
         Prerequisites = @("01-basics/01-hello-world")
+        Difficulty = "Beginner"
     }
     "01-basics/03-outputs" = @{
         Name = "Outputs and Data Sharing"
-        Description = "Learn to expose and share data between Terraform configurations"
+        Description = "Learn to expose values and share data between configurations"
         Prerequisites = @("01-basics/02-variables")
+        Difficulty = "Beginner"
     }
     "01-basics/04-data-sources" = @{
-        Name = "Data Sources and File Processing"
-        Description = "Read and process external data with Terraform data sources"
+        Name = "Data Sources - Reading External Data"
+        Description = "Query existing resources and read external data files"
         Prerequisites = @("01-basics/03-outputs")
+        Difficulty = "Intermediate"
     }
     "01-basics/05-resources" = @{
-        Name = "Advanced Resource Patterns"
-        Description = "Master resource lifecycle, dependencies, and advanced patterns"
+        Name = "Resource Patterns and Dependencies"
+        Description = "Master resource lifecycle, explicit/implicit dependencies"
         Prerequisites = @("01-basics/04-data-sources")
+        Difficulty = "Intermediate"
     }
+    
+    # 02-providers - Working with Providers
     "02-providers/01-local-provider" = @{
-        Name = "Provider Concepts with Local Provider"
-        Description = "Deep dive into Terraform providers and configuration"
+        Name = "Local Provider Deep Dive"
+        Description = "Master the local provider for file and script operations"
         Prerequisites = @("01-basics/05-resources")
+        Difficulty = "Intermediate"
+    }
+    
+    # 03-modules - Reusable Infrastructure
+    "03-modules/01-simple-module" = @{
+        Name = "Your First Module"
+        Description = "Create a reusable Terraform module"
+        Prerequisites = @("02-providers/01-local-provider")
+        Difficulty = "Intermediate"
+    }
+    
+    # 04-state - State Management
+    "04-state/01-local-state" = @{
+        Name = "Understanding Terraform State"
+        Description = "Learn how Terraform tracks infrastructure state"
+        Prerequisites = @("03-modules/01-simple-module")
+        Difficulty = "Intermediate"
+    }
+    
+    # 06-advanced - Advanced Patterns
+    "06-advanced/02-conditional-resources" = @{
+        Name = "Conditional Resources and Dynamic Blocks"
+        Description = "Create resources conditionally and use dynamic blocks"
+        Prerequisites = @("04-state/01-local-state")
+        Difficulty = "Advanced"
     }
 }
 
@@ -731,7 +764,8 @@ function Show-MainMenu {
         foreach ($exerciseId in ($script:Exercises.Keys | Sort-Object)) {
             $exercise = $script:Exercises[$exerciseId]
             $status = if ($script:Progress.CompletedExercises -contains $exerciseId) { "[DONE]" } else { "[TODO]" }
-            $exerciseOptions += "$status $($exercise.Name)"
+            $difficulty = if ($exercise.Difficulty) { "[$($exercise.Difficulty)]" } else { "" }
+            $exerciseOptions += "$status $difficulty $($exercise.Name)"
             $exerciseKeys += $exerciseId
         }
         
