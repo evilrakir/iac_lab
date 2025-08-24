@@ -1,7 +1,17 @@
-# Outputs for Exercise 1: Hello World
-# 
-# This file demonstrates how to define outputs in Terraform.
-# Outputs are similar to PowerShell Write-Output but more structured.
+# ╔════════════════════════════════════════════════════════════════════╗
+# ║  TERRAFORM OUTPUTS - EXPORTING VALUES FROM YOUR CONFIGURATION     ║
+# ║  Learn how to expose data after Terraform runs                    ║
+# ╚════════════════════════════════════════════════════════════════════╝
+
+# WHAT ARE OUTPUTS?
+# =================
+# Outputs are VALUES that Terraform displays after running 'apply'
+# Think of them as:
+#   - Return values from your infrastructure
+#   - Data to share with other configurations
+#   - Information for users or scripts
+#
+# PowerShell equivalent: return $value or Write-Output $value
 
 # Basic string output
 output "lab_directory_path" {

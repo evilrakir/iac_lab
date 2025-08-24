@@ -15,7 +15,25 @@
 
 ## 🚀 Getting Started
 
-### Step 1: Navigate to the Exercise Directory
+### HOW TO START THIS EXERCISE
+
+**IMPORTANT:** Use the main lab launcher from the parent directory:
+
+```powershell
+# Go to the main lab directory
+cd C:\lappyshare\dev\lab
+
+# Run the main lab launcher
+.\Start-TerraformLab.ps1
+```
+
+Then:
+1. Select "01-basics/01-hello-world" from the menu
+2. Choose Option 1 "GUIDED MODE" for step-by-step learning with explanations!
+
+### Alternative: Manual Commands
+
+If you prefer to run commands manually:
 
 ```powershell
 cd 01-basics/01-hello-world

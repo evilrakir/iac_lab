@@ -5,6 +5,13 @@
 user-workspace/
 workspaces/
 *-workspace/
+jefeh-workspace/
+student-workspace/
+temp-workspace/
+# Temporary workspaces created by guided mode
+/tmp/terraform-lab-*
+%TEMP%/terraform-lab-*
+$env:TEMP/terraform-lab-*
 
 # Terraform state and lock files (user-specific)
 *.tfstate
@@ -32,6 +39,13 @@ terraform.tfvars
 terraform-lab-output/
 output/
 test-output/
+**/terraform-lab-output/
+**/output/
+**/test-output/
+# Exercise outputs that shouldn't be committed
+01-basics/*/terraform-lab-output/
+02-providers/*/terraform-lab-output/
+03-modules/*/terraform-lab-output/
 
 # Logs
 *.log
