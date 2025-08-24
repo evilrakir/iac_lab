@@ -58,7 +58,7 @@ locals {
 
 resource "local_file" "variable_demo" {
   filename = "./terraform-lab-output/variable-values.txt"
-  content  = templatefile("${path.module}/templates/variable-demo.tftpl", {
+  content  = templatefile("${path.module}/variable-demo.tftpl", {
     project_name      = var.project_name
     environment       = var.environment
     instance_count    = var.instance_count
@@ -294,75 +294,5 @@ resource "local_file" "powershell_comparison" {
 # ========================================================================
 # RESOURCE 7: Template File Demonstration
 # ========================================================================
-# First, create the template file that we'll use
-
-resource "local_file" "template_file" {
-  filename = "${path.module}/templates/variable-demo.tftpl"
-  content  = <<-EOT
-    TERRAFORM VARIABLES DEMONSTRATION
-    ==================================
-    Generated: $${timestamp}
-    
-    Basic Variables:
-    ----------------
-    Project Name: $${project_name}
-    Environment: $${environment}
-    Instance Count: $${instance_count}
-    Monitoring Enabled: $${monitoring}
-    Port Number: $${port}
-    Server Name: $${server_name}
-    
-    Collection Variables:
-    --------------------
-    Availability Zones: $${join(", ", zones)}
-    Number of Zones: $${zone_count}
-    Primary Zone: $${primary_zone}
-    
-    Allowed IPs: $${join(", ", allowed_ips)}
-    
-    Tags:
-    %{ for key, value in tags ~}
-    - $${key}: $${value}
-    %{ endfor ~}
-    
-    Database Configuration:
-    ----------------------
-    Engine: $${db_config.engine}
-    Version: $${db_config.version}
-    Port: $${db_config.port}
-    Backup Enabled: $${db_config.backup}
-    Replicas: $${db_config.replicas}
-    
-    Server Configurations:
-    ---------------------
-    %{ for server in server_configs ~}
-    - $${server.name}: $${server.size} ($${server.role})
-    %{ endfor ~}
-    
-    Computed Values (Locals):
-    ------------------------
-    Resource Prefix: $${resource_prefix}
-    Instance Type: $${instance_type}
-    
-    Optional Variables:
-    ------------------
-    Custom Domain: $${custom_domain != null ? custom_domain : "Not set"}
-    Backup Retention: $${backup_retention != null ? "$${backup_retention} days" : "Not configured"}
-    
-    Feature Flags:
-    -------------
-    Debug Mode: $${debug_enabled ? "ENABLED" : "DISABLED"}
-    Backups: $${backups_enabled ? "ENABLED" : "DISABLED"}
-    SSL/TLS: $${ssl_enabled ? "ENABLED" : "DISABLED"}
-    
-    Sensitive Variables:
-    -------------------
-    API Key: [REDACTED - marked as sensitive]
-    Database Password: [REDACTED - marked as sensitive]
-  EOT
-  
-  # Ensure template directory exists
-  lifecycle {
-    create_before_destroy = true
-  }
-}
+# The template file is now a static file: variable-demo.tftpl
+# It's used by the templatefile() function in the variable_demo resource above
