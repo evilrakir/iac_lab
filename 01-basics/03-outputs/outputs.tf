@@ -92,15 +92,34 @@ output "api_key" {
   sensitive   = true
 }
 
-# Non-sensitive output about sensitive data
+# IMPORTANT LESSON: Transitive Sensitivity
+# ========================================
+# Any output that references sensitive data MUST be marked sensitive,
+# even if it doesn't expose the actual sensitive value itself.
+# This is a Terraform security feature to prevent accidental data leaks.
+
 output "database_password_info" {
-  description = "Information about the database password"
+  description = "Information about the database password (metadata only)"
   value = {
-    length  = length(random_password.db_password.result)
-    special = random_password.db_password.special
-    numeric = random_password.db_password.numeric
+    length  = length(random_password.db_password.result)  # ← References sensitive data
+    special = random_password.db_password.special        # ← References sensitive data
+    numeric = random_password.db_password.numeric        # ← References sensitive data
   }
-  # Provides info without exposing the actual password
+  sensitive = true  # ← REQUIRED! Without this, terraform plan fails
+  
+  # WHY THIS IS SENSITIVE:
+  # Even though we're only exposing metadata (length, flags), Terraform
+  # considers ANY reference to sensitive data as potentially sensitive.
+  # This prevents accidental exposure through derived values.
+  #
+  # ERROR WITHOUT sensitive=true:
+  # "Output refers to sensitive values... Terraform requires that any 
+  #  root module output containing sensitive data be explicitly marked 
+  #  as sensitive, to confirm your intent."
+  #
+  # POWERSHELL EQUIVALENT:
+  # This is like accessing .Length on a [SecureString] - even metadata
+  # about secure data should be handled carefully.
 }
 
 # ========================================================================
@@ -169,9 +188,7 @@ output "monitoring_config_path" {
 # Output with conditional message
 output "monitoring_status" {
   description = "Monitoring configuration status"
-  value = var.enable_monitoring ? 
-    "Monitoring is ENABLED at ${local_file.monitoring_config[0].filename}" : 
-    "Monitoring is DISABLED"
+  value = var.enable_monitoring ? "Monitoring is ENABLED at ${local_file.monitoring_config[0].filename}" : "Monitoring is DISABLED"
 }
 
 # Complex conditional output

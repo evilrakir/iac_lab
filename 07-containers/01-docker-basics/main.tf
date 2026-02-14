@@ -562,6 +562,273 @@ resource "local_file" "docker_compose_equivalent" {
 }
 
 # ========================================================================
+# POWERSHELL COMPARISON
+# ========================================================================
+
+resource "local_file" "powershell_comparison" {
+  filename = "./terraform-lab-output/terraform-vs-powershell-docker.ps1"
+  
+  content = <<-EOT
+    # PowerShell Equivalent of Terraform Docker Provider
+    # ===================================================
+    # This shows how Terraform Docker resources compare to Docker PowerShell/CLI commands
+    
+    Write-Host "=== Terraform Docker vs PowerShell Docker Commands ===" -ForegroundColor Green
+    
+    # TERRAFORM DOCKER PROVIDER:
+    # terraform {
+    #   required_providers {
+    #     docker = {
+    #       source = "kreuzwerker/docker"
+    #     }
+    #   }
+    # }
+    
+    # POWERSHELL EQUIVALENT:
+    # Check Docker is installed and running
+    if (!(Get-Command docker -ErrorAction SilentlyContinue)) {
+        Write-Host "Docker is not installed!" -ForegroundColor Red
+        return
+    }
+    
+    Write-Host "`nDocker Version:" -ForegroundColor Yellow
+    docker version --format "Client: {{.Client.Version}}`nServer: {{.Server.Version}}"
+    
+    # TERRAFORM: docker_image resource
+    # POWERSHELL EQUIVALENT:
+    Write-Host "`nPulling Docker Images (like docker_image resource):" -ForegroundColor Yellow
+    
+    # Pull nginx image (like Terraform docker_image)
+    docker pull nginx:latest
+    Write-Host "  Pulled nginx:latest"
+    
+    # Pull custom image with specific tag
+    $imageTag = "alpine:3.18"
+    docker pull $imageTag
+    Write-Host "  Pulled $imageTag"
+    
+    # List images (equivalent to terraform state list for docker_image)
+    Write-Host "`nListing Docker Images:" -ForegroundColor Yellow
+    docker images --format "table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.Size}}"
+    
+    # TERRAFORM: docker_container resource
+    # POWERSHELL EQUIVALENT:
+    Write-Host "`nCreating Docker Containers (like docker_container resource):" -ForegroundColor Yellow
+    
+    # Create and run nginx container
+    $containerName = "nginx-web"
+    docker run -d `
+        --name $containerName `
+        -p 8080:80 `
+        -e ENVIRONMENT=development `
+        --restart unless-stopped `
+        nginx:latest
+    Write-Host "  Created container: $containerName"
+    
+    # Create container with volume mount (like Terraform volumes block)
+    $appContainer = "my-app"
+    docker run -d `
+        --name $appContainer `
+        -p 3000:3000 `
+        -v "${PWD}/app:/app" `
+        -v "app-data:/data" `
+        -e NODE_ENV=production `
+        --network my-network `
+        node:18-alpine `
+        node /app/server.js
+    Write-Host "  Created container with volumes: $appContainer"
+    
+    # TERRAFORM: docker_network resource
+    # POWERSHELL EQUIVALENT:
+    Write-Host "`nCreating Docker Networks (like docker_network resource):" -ForegroundColor Yellow
+    
+    # Create custom network
+    docker network create `
+        --driver bridge `
+        --subnet 172.20.0.0/16 `
+        --ip-range 172.20.240.0/20 `
+        my-network
+    Write-Host "  Created network: my-network"
+    
+    # List networks
+    docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}"
+    
+    # TERRAFORM: docker_volume resource
+    # POWERSHELL EQUIVALENT:
+    Write-Host "`nCreating Docker Volumes (like docker_volume resource):" -ForegroundColor Yellow
+    
+    # Create named volume
+    docker volume create app-data
+    docker volume create db-data
+    Write-Host "  Created volumes: app-data, db-data"
+    
+    # List volumes
+    docker volume ls --format "table {{.Name}}\t{{.Driver}}"
+    
+    # TERRAFORM: Docker Compose equivalent
+    Write-Host "`nDocker Compose (similar to multiple Terraform resources):" -ForegroundColor Yellow
+    
+    # Create docker-compose.yml
+    $dockerCompose = @"
+    version: '3.8'
+    services:
+      web:
+        image: nginx:latest
+        ports:
+          - "8080:80"
+        environment:
+          - ENVIRONMENT=development
+        networks:
+          - app-network
+          
+      app:
+        image: node:18-alpine
+        ports:
+          - "3000:3000"
+        volumes:
+          - ./app:/app
+          - app-data:/data
+        environment:
+          - NODE_ENV=production
+        networks:
+          - app-network
+          
+      db:
+        image: postgres:15
+        environment:
+          - POSTGRES_DB=myapp
+          - POSTGRES_USER=admin
+          - POSTGRES_PASSWORD=secret
+        volumes:
+          - db-data:/var/lib/postgresql/data
+        networks:
+          - app-network
+          
+    networks:
+      app-network:
+        driver: bridge
+        
+    volumes:
+      app-data:
+      db-data:
+    "@
+    
+    $dockerCompose | Set-Content -Path "./terraform-lab-output/docker-compose.yml"
+    Write-Host "  Created docker-compose.yml"
+    
+    # Deploy with docker-compose (similar to terraform apply)
+    # docker-compose up -d
+    
+    # CONTAINER MANAGEMENT COMPARISON
+    Write-Host "`nContainer Management Commands:" -ForegroundColor Yellow
+    Write-Host @"
+    Terraform                          PowerShell/Docker CLI
+    ---------                          --------------------
+    terraform apply                    docker-compose up -d
+    terraform destroy                  docker-compose down
+    terraform plan                     docker-compose config
+    terraform state list               docker ps -a
+    terraform state show               docker inspect <container>
+    terraform refresh                  docker ps (check current state)
+    "@
+    
+    # RESOURCE LIFECYCLE
+    Write-Host "`nResource Lifecycle Management:" -ForegroundColor Yellow
+    
+    # Stop container (like Terraform lifecycle stop)
+    docker stop $containerName
+    Write-Host "  Stopped container: $containerName"
+    
+    # Start container
+    docker start $containerName
+    Write-Host "  Started container: $containerName"
+    
+    # Remove container (like terraform destroy for specific resource)
+    docker rm -f $containerName
+    Write-Host "  Removed container: $containerName"
+    
+    # DOCKER BUILD (like docker_image with build context)
+    Write-Host "`nBuilding Docker Images:" -ForegroundColor Yellow
+    
+    # Create a simple Dockerfile
+    $dockerfile = @"
+    FROM alpine:3.18
+    RUN apk add --no-cache curl
+    WORKDIR /app
+    COPY . .
+    CMD ["sh"]
+    "@
+    
+    $dockerfile | Set-Content -Path "./terraform-lab-output/Dockerfile"
+    
+    # Build image (like docker_image with build block)
+    # docker build -t my-app:latest ./terraform-lab-output
+    Write-Host "  Dockerfile created (ready for build)"
+    
+    # TAG AND PUSH (like docker_registry_image)
+    Write-Host "`nTagging and Registry Operations:" -ForegroundColor Yellow
+    Write-Host @"
+    # Tag image
+    docker tag my-app:latest myregistry.com/my-app:v1.0
+    
+    # Push to registry
+    docker push myregistry.com/my-app:v1.0
+    
+    # Pull from registry
+    docker pull myregistry.com/my-app:v1.0
+    "@
+    
+    # DOCKER INSPECT (like terraform show)
+    Write-Host "`nInspecting Resources:" -ForegroundColor Yellow
+    
+    # Inspect container (similar to terraform state show)
+    $inspection = docker inspect nginx-web 2>$null | ConvertFrom-Json
+    if ($inspection) {
+        Write-Host "  Container State: $($inspection.State.Status)"
+        Write-Host "  IP Address: $($inspection.NetworkSettings.IPAddress)"
+    }
+    
+    # KEY DIFFERENCES:
+    Write-Host "`n=== Key Differences ===" -ForegroundColor Magenta
+    Write-Host @"
+    1. DECLARATIVE vs IMPERATIVE:
+       - Terraform: Declares desired Docker state
+       - PowerShell: Executes Docker commands sequentially
+    
+    2. STATE MANAGEMENT:
+       - Terraform: Tracks containers/images in state file
+       - Docker: No built-in state file (containers are state)
+    
+    3. IDEMPOTENCY:
+       - Terraform: Automatically idempotent
+       - Docker CLI: Must check if resource exists first
+    
+    4. DEPENDENCIES:
+       - Terraform: Automatic dependency resolution
+       - Docker: Manual ordering or docker-compose
+    
+    5. ROLLBACK:
+       - Terraform: Can revert to previous state
+       - Docker: No automatic rollback mechanism
+    
+    6. RESOURCE RELATIONSHIPS:
+       - Terraform: Explicit relationships in configuration
+       - Docker: Implicit through names/networks
+    
+    7. DRIFT DETECTION:
+       - Terraform: Detects changes with refresh/plan
+       - Docker: Must manually compare desired vs actual
+    
+    8. MULTI-HOST:
+       - Terraform: Can manage across multiple Docker hosts
+       - Docker CLI: Single host (use Swarm/K8s for multi-host)
+    "@
+    
+    Write-Host "`nTerraform provides declarative, stateful Docker management!" -ForegroundColor Green
+  EOT
+}
+
+# ========================================================================
 # OUTPUTS
 # ========================================================================
 

@@ -64,7 +64,7 @@ module "production_app" {
   app_name    = "main-application"
   environment = "prod"
   app_version = "3.0.0"
-  port        = 443
+  port        = 8443
   
   features = {
     monitoring = true
@@ -77,7 +77,7 @@ module "production_app" {
   database_type    = "postgresql"
   create_readme    = false  # Don't need README in prod
   
-  output_path = "${path.module}/production-configs"
+  output_path = "./terraform-lab-output/production-configs"
   
   tags = {
     managed_by  = "terraform"
@@ -107,7 +107,7 @@ module "microservices_stack" {
     debug      = true
   }
   
-  output_path = "${path.module}/microservices"
+  output_path = "./terraform-lab-output/microservices"
 }
 
 # ========================================================================
@@ -116,7 +116,7 @@ module "microservices_stack" {
 
 # Create a file using outputs from modules
 resource "local_file" "deployment_manifest" {
-  filename = "${path.module}/DEPLOYMENT_MANIFEST.json"
+  filename = "./terraform-lab-output/DEPLOYMENT_MANIFEST.json"
   
   content = jsonencode({
     deployments = {
@@ -223,7 +223,7 @@ module "dynamic_services" {
   
   database_enabled = each.value.database
   
-  output_path = "${path.module}/services/${each.key}"
+  output_path = "./terraform-lab-output/services/${each.key}"
 }
 
 # ========================================================================
@@ -232,7 +232,7 @@ module "dynamic_services" {
 
 # Create a summary showing module best practices
 resource "local_file" "module_best_practices" {
-  filename = "${path.module}/MODULE_BEST_PRACTICES.md"
+  filename = "./terraform-lab-output/MODULE_BEST_PRACTICES.md"
   
   content = <<-EOT
     # Terraform Module Best Practices
@@ -296,6 +296,141 @@ resource "local_file" "module_best_practices" {
     4. Validate all outputs
     
     Generated at: ${timestamp()}
+  EOT
+}
+
+# ========================================================================
+# POWERSHELL COMPARISON
+# ========================================================================
+
+resource "local_file" "powershell_comparison" {
+  filename = "./terraform-lab-output/terraform-vs-powershell-modules.ps1"
+  
+  content = <<-EOT
+    # PowerShell Equivalent of Terraform Modules
+    # ===========================================
+    # This shows how Terraform modules compare to PowerShell functions/modules
+    
+    Write-Host "=== Terraform Modules vs PowerShell Functions ===" -ForegroundColor Green
+    
+    # TERRAFORM MODULE:
+    # module "web_app" {
+    #   source = "./my-first-module"
+    #   app_name = "web-frontend"
+    #   environment = "dev"
+    # }
+    
+    # POWERSHELL EQUIVALENT (Function):
+    function Deploy-Application {
+        param(
+            [Parameter(Mandatory=$true)]
+            [string]$AppName,
+            
+            [Parameter(Mandatory=$true)]
+            [string]$Environment,
+            
+            [string]$AppVersion = "1.0.0",
+            [int]$Port = 8080,
+            [hashtable]$Features = @{},
+            [hashtable]$Tags = @{}
+        )
+        
+        # Create configuration
+        $config = @{
+            application = @{
+                name = $AppName
+                version = $AppVersion
+                environment = $Environment
+                port = $Port
+            }
+            features = $Features
+            tags = $Tags
+        }
+        
+        # Save configuration
+        $config | ConvertTo-Json | Set-Content -Path "./terraform-lab-output/$AppName-config.json"
+        
+        # Return outputs (like Terraform module outputs)
+        return @{
+            app_identifier = "$AppName-$Environment-$AppVersion"
+            port = $Port
+            config_path = "./terraform-lab-output/$AppName-config.json"
+        }
+    }
+    
+    Write-Host "`nUsing PowerShell Functions (like Terraform modules):" -ForegroundColor Yellow
+    
+    # Call the function multiple times (like module instances)
+    $webApp = Deploy-Application -AppName "web-frontend" -Environment "dev"
+    Write-Host "  Deployed: $($webApp.app_identifier)"
+    
+    $apiService = Deploy-Application -AppName "api-backend" -Environment "staging" -Port 3000 -AppVersion "2.1.0"
+    Write-Host "  Deployed: $($apiService.app_identifier)"
+    
+    # POWERSHELL MODULE STRUCTURE:
+    Write-Host "`nPowerShell Module Structure:" -ForegroundColor Yellow
+    Write-Host @"
+    MyModule/
+    ├── MyModule.psd1     # Module manifest (like terraform.tf)
+    ├── MyModule.psm1     # Module script (like main.tf)
+    ├── Public/           # Exported functions
+    │   └── Deploy-Application.ps1
+    └── Private/          # Internal functions
+        └── Helper-Functions.ps1
+    "@
+    
+    # Dynamic module creation (like for_each)
+    Write-Host "`nDynamic Function Calls (like Terraform for_each):" -ForegroundColor Yellow
+    $services = @{
+        auth = @{ version = "1.0.0"; port = 8081 }
+        payment = @{ version = "1.1.0"; port = 8082 }
+        notification = @{ version = "2.0.0"; port = 8083 }
+    }
+    
+    $deployedServices = @{}
+    foreach ($service in $services.GetEnumerator()) {
+        $deployedServices[$service.Key] = Deploy-Application `
+            -AppName $service.Key `
+            -Environment "dev" `
+            -AppVersion $service.Value.version `
+            -Port $service.Value.port
+        Write-Host "  Deployed: $($service.Key) on port $($service.Value.port)"
+    }
+    
+    # KEY DIFFERENCES:
+    Write-Host "`n=== Key Differences ===" -ForegroundColor Magenta
+    Write-Host @"
+    1. MODULE STRUCTURE:
+       - Terraform: Separate .tf files, declarative
+       - PowerShell: .ps1/.psm1 files, imperative
+    
+    2. INPUT VARIABLES vs PARAMETERS:
+       - Terraform: variable blocks with types/validation
+       - PowerShell: param blocks with types/validation
+    
+    3. OUTPUTS vs RETURN VALUES:
+       - Terraform: output blocks, accessible via module.name.output
+       - PowerShell: return statements or output objects
+    
+    4. STATE MANAGEMENT:
+       - Terraform: Tracks module state automatically
+       - PowerShell: No built-in state tracking
+    
+    5. DEPENDENCY MANAGEMENT:
+       - Terraform: Automatic dependency resolution
+       - PowerShell: Manual dependency handling
+    
+    6. COMMON PATTERNS:
+       Terraform Module      ->  PowerShell Function/Module
+       module "name"         ->  Function-Name
+       source = "./path"     ->  . ./path/script.ps1
+       var.name             ->  $ParameterName
+       output "name"        ->  return $value
+       for_each             ->  foreach loop
+       count                ->  1..n | ForEach-Object
+    "@
+    
+    Write-Host "`nYour PowerShell skills directly translate to Terraform modules!" -ForegroundColor Green
   EOT
 }
 

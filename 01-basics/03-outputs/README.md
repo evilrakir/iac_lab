@@ -55,6 +55,29 @@ Write-Host "Project ID: $($deployment.ProjectId)"
 - **Formatted Outputs**: Multi-line strings with formatting
 - **Complex Objects**: Nested data structures
 
+### 4. ⚠️ Important: Transitive Sensitivity
+**Critical Learning Point**: Any output that references sensitive data MUST be marked as `sensitive = true`, even if it doesn't expose the actual sensitive value.
+
+```hcl
+# This will FAIL without sensitive = true
+output "password_info" {
+  value = {
+    length = length(random_password.db_password.result)  # References sensitive data
+  }
+  sensitive = true  # REQUIRED!
+}
+```
+
+**Why?** Terraform considers ANY reference to sensitive data as potentially sensitive to prevent accidental data leaks through derived values. This is a security feature, not a bug!
+
+**Common Error**: 
+```
+Error: Output refers to sensitive values
+To reduce the risk of accidentally exporting sensitive data that was intended to be only internal, Terraform requires that any root module output containing sensitive data be explicitly marked as sensitive, to confirm your intent.
+```
+
+**PowerShell Analogy**: Like accessing `.Length` on a `[SecureString]` - even metadata about secure data should be handled carefully.
+
 ## Commands to Run
 
 ```bash

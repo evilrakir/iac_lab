@@ -12,7 +12,7 @@ INFRASTRUCTURE SETTINGS
 Instance Count: ${instance_count}
 Server Name: ${server_name}
 Port Number: ${port}
-Custom Domain: ${custom_domain}
+Custom Domain: ${custom_domain != null ? custom_domain : "Not configured"}
 
 FEATURE FLAGS
 ------------
@@ -20,7 +20,7 @@ Monitoring Enabled: ${monitoring}
 Debug Mode: ${debug_enabled}
 Backups Enabled: ${backups_enabled}
 SSL Enabled: ${ssl_enabled}
-Backup Retention: ${backup_retention} days
+Backup Retention: ${backup_retention != null ? "${backup_retention} days" : "Not configured"}
 
 AVAILABILITY ZONES
 -----------------

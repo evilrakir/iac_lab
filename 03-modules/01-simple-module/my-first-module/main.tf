@@ -7,7 +7,7 @@
 
 # Create the main application configuration file
 resource "local_file" "app_config" {
-  filename = var.output_path != "" ? "${var.output_path}/${var.app_name}-config.json" : "${path.module}/output/${var.app_name}-config.json"
+  filename = var.output_path != "" ? "${var.output_path}/${var.app_name}-config.json" : "./terraform-lab-output/${var.app_name}-config.json"
   
   content = jsonencode({
     application = {
@@ -36,7 +36,7 @@ resource "local_file" "app_config" {
 
 # Create environment-specific configuration
 resource "local_file" "env_config" {
-  filename = var.output_path != "" ? "${var.output_path}/${var.environment}.env" : "${path.module}/output/${var.environment}.env"
+  filename = var.output_path != "" ? "${var.output_path}/${var.environment}.env" : "./terraform-lab-output/${var.environment}.env"
   
   content = <<-EOT
     # Environment Configuration for ${var.app_name}
@@ -66,7 +66,7 @@ resource "local_file" "env_config" {
 resource "local_file" "readme" {
   count = var.create_readme ? 1 : 0
   
-  filename = var.output_path != "" ? "${var.output_path}/README.md" : "${path.module}/output/README.md"
+  filename = var.output_path != "" ? "${var.output_path}/README.md" : "./terraform-lab-output/README.md"
   
   content = <<-EOT
     # ${var.app_name}

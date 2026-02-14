@@ -205,3 +205,7 @@ variable "lab_config" {
 #   If no default and not provided, Terraform will prompt you!
 
 # TIP: Run 'terraform plan' to see current variable values in use!
+
+
+
+

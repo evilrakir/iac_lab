@@ -42,7 +42,7 @@ resource "random_id" "state_id" {
 
 # Create a file - Terraform tracks this in state
 resource "local_file" "state_example" {
-  filename = "${path.module}/output/state-demo.txt"
+  filename = "./terraform-lab-output/state-demo.txt"
   content  = <<-EOT
     Terraform State Demonstration
     =============================
@@ -68,7 +68,7 @@ resource "local_file" "state_example" {
 resource "local_file" "config_files" {
   count = 3
   
-  filename = "${path.module}/output/config-${count.index}.json"
+  filename = "./terraform-lab-output/config-${count.index}.json"
   content = jsonencode({
     index       = count.index
     id          = "config-${count.index}"
@@ -85,7 +85,7 @@ resource "local_file" "service_configs" {
     db  = { port = 5432, enabled = false }
   }
   
-  filename = "${path.module}/output/services/${each.key}.yaml"
+  filename = "./terraform-lab-output/services/${each.key}.yaml"
   content = yamlencode({
     service = each.key
     config  = each.value
@@ -107,7 +107,7 @@ resource "random_password" "secret" {
 }
 
 resource "local_sensitive_file" "credentials" {
-  filename = "${path.module}/output/.credentials"
+  filename = "./terraform-lab-output/.credentials"
   content  = random_password.secret.result
   
   # Sensitive resources are still in state
@@ -120,12 +120,12 @@ resource "local_sensitive_file" "credentials" {
 
 # Create resources with dependencies to show in state
 resource "local_file" "primary" {
-  filename = "${path.module}/output/primary.txt"
+  filename = "./terraform-lab-output/primary.txt"
   content  = "Primary resource created at ${timestamp()}"
 }
 
 resource "local_file" "dependent" {
-  filename = "${path.module}/output/dependent.txt"
+  filename = "./terraform-lab-output/dependent.txt"
   content  = <<-EOT
     This resource depends on: ${local_file.primary.filename}
     Primary ID: ${local_file.primary.id}
@@ -143,7 +143,7 @@ resource "local_file" "dependent" {
 
 # Resource with lifecycle rules
 resource "local_file" "persistent" {
-  filename = "${path.module}/output/persistent.txt"
+  filename = "./terraform-lab-output/persistent.txt"
   content  = "This file demonstrates lifecycle rules"
   
   lifecycle {
@@ -159,7 +159,7 @@ resource "local_file" "persistent" {
 
 # Create a file outside of Terraform (simulating existing infrastructure)
 resource "local_file" "manual_creation" {
-  filename = "${path.module}/output/existing-file.txt"
+  filename = "./terraform-lab-output/existing-file.txt"
   content  = <<-EOT
     This file simulates existing infrastructure.
     
@@ -178,7 +178,7 @@ resource "local_file" "manual_creation" {
 
 # Create a comprehensive state demonstration
 resource "local_file" "state_inspection_guide" {
-  filename = "${path.module}/output/STATE_COMMANDS.md"
+  filename = "./terraform-lab-output/STATE_COMMANDS.md"
   content  = <<-EOT
     # Terraform State Commands
     
@@ -267,7 +267,7 @@ resource "local_file" "state_inspection_guide" {
 
 # Demonstrate drift between state and configuration
 resource "local_file" "drift_demo" {
-  filename = "${path.module}/output/drift-demo.txt"
+  filename = "./terraform-lab-output/drift-demo.txt"
   content  = <<-EOT
     State vs Configuration
     ======================
@@ -302,7 +302,7 @@ data "local_file" "read_existing" {
 
 # Create a file showing data source information
 resource "local_file" "data_source_info" {
-  filename = "${path.module}/output/data-source-state.txt"
+  filename = "./terraform-lab-output/data-source-state.txt"
   content  = <<-EOT
     Data Sources in State
     =====================
@@ -327,7 +327,7 @@ resource "local_file" "data_source_info" {
 # ========================================================================
 
 resource "local_file" "workspace_info" {
-  filename = "${path.module}/output/WORKSPACES.md"
+  filename = "./terraform-lab-output/WORKSPACES.md"
   content  = <<-EOT
     # Terraform Workspaces
     
@@ -383,6 +383,202 @@ resource "local_file" "workspace_info" {
     
     Generated at: ${timestamp()}
   EOT
+}
+
+# ========================================================================
+# POWERSHELL COMPARISON
+# ========================================================================
+
+resource "local_file" "powershell_comparison" {
+  filename = "./terraform-lab-output/terraform-vs-powershell-state.ps1"
+  
+  content = <<-EOT
+    # PowerShell Equivalent of Terraform State Management
+    # ====================================================
+    # This shows how Terraform state compares to PowerShell session management
+    
+    Write-Host "=== Terraform State vs PowerShell Session State ===" -ForegroundColor Green
+    
+    # TERRAFORM STATE:
+    # Terraform automatically tracks all resources in terraform.tfstate
+    # terraform {
+    #   backend "local" {
+    #     path = "terraform.tfstate"
+    #   }
+    # }
+    
+    # POWERSHELL EQUIVALENT:
+    # Manual state tracking with variables or files
+    $script:InfrastructureState = @{
+        Resources = @{}
+        LastModified = Get-Date
+        Version = "1.0"
+    }
+    
+    Write-Host "`nManual State Management in PowerShell:" -ForegroundColor Yellow
+    
+    # Creating a resource and tracking it
+    function New-InfrastructureResource {
+        param(
+            [string]$Name,
+            [string]$Type,
+            [hashtable]$Properties
+        )
+        
+        # Create the resource (e.g., a file)
+        $resourcePath = "./terraform-lab-output/$Name.json"
+        $Properties | ConvertTo-Json | Set-Content -Path $resourcePath
+        
+        # Track in our state
+        $script:InfrastructureState.Resources[$Name] = @{
+            Type = $Type
+            Path = $resourcePath
+            Properties = $Properties
+            CreatedAt = Get-Date
+            Id = [guid]::NewGuid().ToString()
+        }
+        
+        Write-Host "  Created and tracked: $Name"
+        return $script:InfrastructureState.Resources[$Name]
+    }
+    
+    # Example resource creation
+    $webConfig = New-InfrastructureResource -Name "web-config" -Type "config" -Properties @{
+        port = 8080
+        environment = "dev"
+    }
+    
+    # Saving state to file (like terraform.tfstate)
+    Write-Host "`nSaving State to File:" -ForegroundColor Yellow
+    $script:InfrastructureState | ConvertTo-Json -Depth 10 | 
+        Set-Content -Path "./terraform-lab-output/infrastructure-state.json"
+    Write-Host "  State saved to infrastructure-state.json"
+    
+    # Loading state from file
+    Write-Host "`nLoading State from File:" -ForegroundColor Yellow
+    if (Test-Path "./terraform-lab-output/infrastructure-state.json") {
+        $loadedState = Get-Content "./terraform-lab-output/infrastructure-state.json" | 
+            ConvertFrom-Json
+        Write-Host "  State loaded with $($loadedState.Resources.Count) resources"
+    }
+    
+    # State operations comparison
+    Write-Host "`nState Operations Comparison:" -ForegroundColor Yellow
+    Write-Host @"
+    Terraform: terraform state list
+    PowerShell: `$script:InfrastructureState.Resources.Keys
+    
+    Terraform: terraform state show resource.name
+    PowerShell: `$script:InfrastructureState.Resources['name']
+    
+    Terraform: terraform state rm resource.name
+    PowerShell: `$script:InfrastructureState.Resources.Remove('name')
+    
+    Terraform: terraform refresh
+    PowerShell: Custom function to check actual vs tracked state
+    "@
+    
+    # Drift detection example
+    Write-Host "`nDrift Detection (Manual in PowerShell):" -ForegroundColor Yellow
+    function Test-InfrastructureDrift {
+        foreach ($resource in $script:InfrastructureState.Resources.GetEnumerator()) {
+            if (Test-Path $resource.Value.Path) {
+                $actual = Get-Content $resource.Value.Path | ConvertFrom-Json
+                $tracked = $resource.Value.Properties
+                
+                # Simple comparison
+                $actualJson = $actual | ConvertTo-Json -Compress
+                $trackedJson = $tracked | ConvertTo-Json -Compress
+                
+                if ($actualJson -ne $trackedJson) {
+                    Write-Host "  DRIFT DETECTED: $($resource.Key)" -ForegroundColor Red
+                } else {
+                    Write-Host "  No drift: $($resource.Key)" -ForegroundColor Green
+                }
+            } else {
+                Write-Host "  MISSING: $($resource.Key)" -ForegroundColor Red
+            }
+        }
+    }
+    
+    # State locking comparison
+    Write-Host "`nState Locking:" -ForegroundColor Yellow
+    Write-Host @"
+    TERRAFORM:
+    - Automatic state locking with most backends
+    - Prevents concurrent modifications
+    - terraform force-unlock for stuck locks
+    
+    POWERSHELL:
+    - Must implement manual locking:
+    "@
+    
+    # Manual locking example
+    function Lock-InfrastructureState {
+        $lockFile = "./terraform-lab-output/.state.lock"
+        $lockInfo = @{
+            User = $env:USERNAME
+            Process = $PID
+            Time = Get-Date
+        }
+        
+        if (Test-Path $lockFile) {
+            Write-Host "  State is locked!" -ForegroundColor Red
+            return $false
+        }
+        
+        $lockInfo | ConvertTo-Json | Set-Content -Path $lockFile
+        Write-Host "  State locked successfully"
+        return $true
+    }
+    
+    function Unlock-InfrastructureState {
+        $lockFile = "./terraform-lab-output/.state.lock"
+        if (Test-Path $lockFile) {
+            Remove-Item $lockFile
+            Write-Host "  State unlocked"
+        }
+    }
+    
+    # KEY DIFFERENCES:
+    Write-Host "`n=== Key Differences ===" -ForegroundColor Magenta
+    Write-Host @"
+    1. AUTOMATIC vs MANUAL:
+       - Terraform: Automatic state tracking
+       - PowerShell: Manual state management required
+    
+    2. STATE FORMAT:
+       - Terraform: Structured JSON with metadata
+       - PowerShell: Custom format (usually JSON/XML)
+    
+    3. DRIFT DETECTION:
+       - Terraform: Built-in with refresh
+       - PowerShell: Must implement comparison logic
+    
+    4. STATE LOCKING:
+       - Terraform: Automatic with backends
+       - PowerShell: Manual file/mutex locking
+    
+    5. REMOTE STATE:
+       - Terraform: Built-in backend support (S3, Azure, etc.)
+       - PowerShell: Custom implementation needed
+    
+    6. STATE OPERATIONS:
+       - Terraform: Rich CLI commands for state
+       - PowerShell: Custom functions required
+    
+    7. ROLLBACK:
+       - Terraform: State file versions/backups
+       - PowerShell: Manual backup strategy needed
+    "@
+    
+    Write-Host "`nTerraform's state management is a key differentiator from imperative tools!" -ForegroundColor Green
+  EOT
+  
+  depends_on = [
+    local_file.state_demo_file,
+    local_file.state_commands
+  ]
 }
 
 # ========================================================================

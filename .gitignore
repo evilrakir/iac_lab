@@ -28,6 +28,7 @@ tfplan
 *.config.json
 .lab-progress/
 .lab-config/
+.terraform-lab-completed
 
 # Local environment files
 .env

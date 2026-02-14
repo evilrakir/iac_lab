@@ -12,7 +12,9 @@
 [CmdletBinding()]
 param(
     [string]$Exercise = "",
-    [switch]$ShowStats
+    [switch]$ShowStats,
+    [switch]$SkipPrerequisites,
+    [switch]$ResetProgress
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,7 +22,8 @@ $ErrorActionPreference = "Stop"
 # Configuration
 $script:LabRoot = $PSScriptRoot
 $script:TerraformPath = "C:\Tools\Terraform\terraform.exe"
-$script:ProgressFile = Join-Path $env:TEMP "terraform-lab-progress.json"
+# Store progress in user's AppData folder, not in the repo
+$script:ProgressFile = Join-Path $env:APPDATA "TerraformLab\progress.json"
 
 # Progress tracking
 $script:Progress = @{
@@ -169,6 +172,12 @@ function Show-Menu {
 function Test-Prerequisites {
     param([string]$ExerciseId)
     
+    # Skip prerequisite check if override is set
+    if ($script:SkipPrerequisites) {
+        Write-Warning "Skipping prerequisite check (override enabled)"
+        return $true
+    }
+    
     $exercise = $script:Exercises[$ExerciseId]
     if (-not $exercise.Prerequisites -or $exercise.Prerequisites.Count -eq 0) {
         return $true
@@ -182,6 +191,11 @@ function Test-Prerequisites {
             Write-Error "Prerequisite not met: $prereq"
             $allMet = $false
         }
+    }
+    
+    if (-not $allMet) {
+        Write-Host ""
+        Write-Warning "TIP: Use -SkipPrerequisites parameter to override prerequisite check"
     }
     
     return $allMet
@@ -204,10 +218,20 @@ function Invoke-TerraformCommand {
         Write-Info "Running: terraform $Command"
         Write-Host ""
         
-        # Use Start-Process for interactive commands or direct execution for streaming output
+        # Handle interactive vs non-interactive commands
         if ($Command -match "apply" -and $Command -notmatch "auto-approve") {
-            # Interactive apply - let user see output and respond
-            & $script:TerraformPath $Command.Split(' ')
+            # Interactive apply - use Start-Process to properly handle confirmation prompt
+            Write-Host "Running interactive terraform apply..." -ForegroundColor Yellow
+            Write-Host "You will be prompted to confirm. Type 'yes' when asked." -ForegroundColor Cyan
+            Write-Host ""
+            
+            $process = Start-Process -FilePath $script:TerraformPath -ArgumentList $Command.Split(' ') -Wait -PassThru -NoNewWindow
+            
+            if ($process.ExitCode -eq 0) {
+                $LASTEXITCODE = 0
+            } else {
+                $LASTEXITCODE = $process.ExitCode
+            }
         } else {
             # Non-interactive commands - stream output directly
             & $script:TerraformPath $Command.Split(' ')
@@ -227,21 +251,88 @@ function Invoke-TerraformCommand {
     }
 }
 
-function Test-ExerciseCompletion {
+function Mark-ExerciseCompleted {
     param([string]$ExerciseId, [string]$WorkspacePath)
     
-    # If no workspace path provided, check the exercise directory (legacy)
+    # Default to the exercise directory
     if (-not $WorkspacePath) {
         $WorkspacePath = Join-Path $script:LabRoot $ExerciseId
     }
     
-    # Basic validation - check if terraform.tfstate exists and has resources
+    # Count resources in state file
+    $resourceCount = 0
+    $statePath = Join-Path $WorkspacePath "terraform.tfstate"
+    if (Test-Path $statePath) {
+        try {
+            $state = Get-Content $statePath | ConvertFrom-Json
+            if ($state.resources) {
+                $resourceCount = $state.resources.Count
+            }
+        } catch {
+            Write-Warning "Could not parse state file for resource count"
+        }
+    }
+    
+    # Create completion marker
+    $completionMarkerPath = Join-Path $WorkspacePath ".terraform-lab-completed"
+    $completionData = @{
+        ExerciseId = $ExerciseId
+        CompletedAt = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        ResourceCount = $resourceCount
+        Method = "TerraformApply"
+        LabVersion = "1.0"
+    }
+    
+    try {
+        $completionData | ConvertTo-Json | Set-Content $completionMarkerPath
+        Write-Success "Exercise marked as completed!"
+        Write-Info "Completion marker created: $completionMarkerPath"
+        return $true
+    } catch {
+        Write-Warning "Could not create completion marker: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+function Test-ExerciseCompletion {
+    param([string]$ExerciseId, [string]$WorkspacePath)
+    
+    # Default to the exercise directory
+    if (-not $WorkspacePath) {
+        $WorkspacePath = Join-Path $script:LabRoot $ExerciseId
+    }
+    
+    # Check for completion marker file first (created when terraform apply succeeds)
+    $completionMarkerPath = Join-Path $WorkspacePath ".terraform-lab-completed"
+    if (Test-Path $completionMarkerPath) {
+        try {
+            $completionData = Get-Content $completionMarkerPath | ConvertFrom-Json
+            Write-Success "Exercise validation passed: Completed on $($completionData.CompletedAt)"
+            Write-Success "Resources created: $($completionData.ResourceCount)"
+            return $true
+        } catch {
+            Write-Warning "Could not parse completion marker file, checking state file..."
+        }
+    }
+    
+    # Fallback: Check if terraform.tfstate exists and has resources (for backward compatibility)
     $statePath = Join-Path $WorkspacePath "terraform.tfstate"
     if (Test-Path $statePath) {
         try {
             $state = Get-Content $statePath | ConvertFrom-Json
             if ($state.resources -and $state.resources.Count -gt 0) {
-                Write-Success "Exercise validation passed: $($state.resources.Count) resources found"
+                Write-Success "Exercise validation passed: $($state.resources.Count) resources found in state"
+                
+                # Create completion marker for future validation
+                $completionData = @{
+                    ExerciseId = $ExerciseId
+                    CompletedAt = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+                    ResourceCount = $state.resources.Count
+                    Method = "StateFileValidation"
+                }
+                $completionData | ConvertTo-Json | Set-Content $completionMarkerPath
+                Write-Info "Created completion marker for future validation"
+                
                 return $true
             }
         } catch {
@@ -249,7 +340,8 @@ function Test-ExerciseCompletion {
         }
     }
     
-    Write-Warning "Exercise not yet complete - no valid Terraform state found"
+    Write-Warning "Exercise not yet complete - no completion marker or valid Terraform state found"
+    Write-Info "Complete the exercise by successfully running 'terraform apply'"
     return $false
 }
 
@@ -268,31 +360,31 @@ function Start-Exercise {
         return
     }
     
-    # Create a user workspace for this exercise session
-    $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-    $workspacePath = Join-Path $env:TEMP "terraform-lab-$($ExerciseId.Replace('/', '-'))-$timestamp"
+    # Use the exercise directory directly
+    $workspacePath = $exercisePath
     
-    Write-Info "Creating workspace: $workspacePath"
-    New-Item -ItemType Directory -Path $workspacePath -Force | Out-Null
-    
-    # Copy exercise files to workspace
-    Write-Info "Copying exercise files to workspace..."
-    Get-ChildItem $exercisePath -File -Filter "*.tf" | ForEach-Object {
-        Copy-Item $_.FullName -Destination $workspacePath
-    }
-    if (Test-Path "$exercisePath\terraform.tfvars") {
-        Copy-Item "$exercisePath\terraform.tfvars" -Destination $workspacePath
-    }
-    # Copy template files
-    Get-ChildItem $exercisePath -File -Filter "*.tftpl" | ForEach-Object {
-        Copy-Item $_.FullName -Destination $workspacePath
-    }
-    # Copy any other configuration files
-    Get-ChildItem $exercisePath -File -Filter "*.yaml" | ForEach-Object {
-        Copy-Item $_.FullName -Destination $workspacePath
-    }
-    Get-ChildItem $exercisePath -File -Filter "*.yml" | ForEach-Object {
-        Copy-Item $_.FullName -Destination $workspacePath
+    # Clean up any previous Terraform state in the exercise directory
+    Push-Location $workspacePath
+    try {
+        if (Test-Path ".terraform") {
+            Write-Info "Cleaning up previous Terraform state..."
+            Remove-Item -Path ".terraform" -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        if (Test-Path ".terraform.lock.hcl") {
+            Write-Info "Removing Terraform lock file..."
+            Remove-Item -Path ".terraform.lock.hcl" -Force -ErrorAction SilentlyContinue
+        }
+        if (Test-Path "terraform.tfstate") {
+            Write-Info "Backing up existing state..."
+            $backupName = "terraform.tfstate.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+            Copy-Item "terraform.tfstate" $backupName -Force
+        }
+        if (Test-Path "terraform-lab-output") {
+            Write-Info "Cleaning up previous output..."
+            Remove-Item -Path "terraform-lab-output" -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    } finally {
+        Pop-Location
     }
     
     Show-Header $exercise.Name $exercise.Description
@@ -304,10 +396,10 @@ function Start-Exercise {
         return
     }
     
-    Write-Host "Source Files: $exercisePath" -ForegroundColor Gray
-    Write-Host "Workspace: $workspacePath" -ForegroundColor Gray
+    Write-Host "Exercise Directory: $workspacePath" -ForegroundColor Cyan
     Write-Host ""
-    Write-Info "Your work will be done in a temporary workspace to keep the lab files clean."
+    Write-Warning "Working directly in the exercise directory."
+    Write-Warning "Output files will be created in: $workspacePath\terraform-lab-output"
     Write-Host ""
     
     $ready = Read-Host "Ready to start this exercise? (Y/n)"
@@ -325,6 +417,7 @@ function Start-Exercise {
             "Apply changes (terraform apply)",
             "Show current state (terraform show)",
             "Validate exercise completion",
+            "Reset this exercise (clean all state/output)",
             "Return to main menu"
         )
         
@@ -467,7 +560,22 @@ function Start-Exercise {
                         Write-Success "Correct! Running terraform apply..."
                         Write-Warning "Remember: Type 'yes' when prompted to confirm!"
                         Write-Host ""
-                        Invoke-TerraformCommand "apply" $workspacePath
+                        $applySuccess = Invoke-TerraformCommand "apply" $workspacePath
+                        
+                        # Mark exercise complete if apply succeeded
+                        if ($applySuccess) {
+                            Write-Host ""
+                            # Create completion marker
+                            if (Mark-ExerciseCompleted $ExerciseId $workspacePath) {
+                                Write-Success "*** EXERCISE COMPLETED SUCCESSFULLY! ***"
+                                if ($script:Progress.CompletedExercises -notcontains $ExerciseId) {
+                                    $script:Progress.CompletedExercises += $ExerciseId
+                                    $script:Progress.TotalScore += 100
+                                    Save-Progress
+                                    Write-Success "Progress saved! Total score: $($script:Progress.TotalScore)"
+                                }
+                            }
+                        }
                         break
                     } elseif ($userCommand -eq "skip") {
                         Write-Host "Skipping this step..." -ForegroundColor Yellow
@@ -563,8 +671,8 @@ function Start-Exercise {
                 Write-Host "  4. terraform show    - View current state" -ForegroundColor White
                 Write-Host "  5. terraform destroy - Remove resources" -ForegroundColor White
                 Write-Host ""
-                Write-Host "Your workspace files are located at:" -ForegroundColor Cyan
-                Write-Host "  $workspacePath" -ForegroundColor White
+                Write-Host "Your output files are located at:" -ForegroundColor Cyan
+                Write-Host "  $workspacePath\terraform-lab-output" -ForegroundColor White
                 Write-Host ""
                 Write-Host "Practice these commands until they become second nature!" -ForegroundColor Green
             }
@@ -606,14 +714,44 @@ function Start-Exercise {
                 Write-Host "TIP: Read the comments in each file as they explain the concepts!" -ForegroundColor Green
             }
             2 { Invoke-TerraformCommand "init" $workspacePath }
-            3 { Invoke-TerraformCommand "plan" $workspacePath }
+            3 { 
+                # Check if providers are initialized before plan
+                if (-not (Test-Path "$workspacePath\.terraform")) {
+                    Write-Warning "Terraform not initialized. Running terraform init first..."
+                    Invoke-TerraformCommand "init" $workspacePath
+                    Write-Host ""
+                }
+                Invoke-TerraformCommand "plan" $workspacePath 
+            }
             4 { 
                 Write-Warning "This will create resources. Continue? (y/N)"
                 if ((Read-Host) -eq 'y') {
-                    Invoke-TerraformCommand "apply -auto-approve" $workspacePath
+                    # Check if providers are initialized
+                    if (-not (Test-Path "$workspacePath\.terraform")) {
+                        Write-Warning "Terraform not initialized. Running terraform init first..."
+                        Invoke-TerraformCommand "init" $workspacePath
+                        Write-Host ""
+                    }
+                    $applySuccess = Invoke-TerraformCommand "apply -auto-approve" $workspacePath
+                    
+                    # Mark exercise complete if apply succeeded
+                    if ($applySuccess) {
+                        Write-Host ""
+                        if (Mark-ExerciseCompleted $ExerciseId $workspacePath) {
+                            Write-Success "Exercise marked as completed!"
+                        }
+                    }
                 }
             }
-            5 { Invoke-TerraformCommand "show" $workspacePath }
+            5 { 
+                # Check if providers are initialized before show
+                if (-not (Test-Path "$workspacePath\.terraform")) {
+                    Write-Warning "Terraform not initialized. Running terraform init first..."
+                    Invoke-TerraformCommand "init" $workspacePath
+                    Write-Host ""
+                }
+                Invoke-TerraformCommand "show" $workspacePath 
+            }
             6 {
                 if (Test-ExerciseCompletion $ExerciseId $workspacePath) {
                     Write-Success "*** EXERCISE COMPLETED! ***"
@@ -635,10 +773,27 @@ function Start-Exercise {
                     Show-ExerciseHelp $ExerciseId
                 }
             }
-            7 { return }
+            7 {
+                # Reset this exercise
+                Write-Warning "This will clean up all state and output for this exercise."
+                $confirm = Read-Host "Are you sure? (yes/no)"
+                if ($confirm -eq "yes") {
+                    Push-Location $workspacePath
+                    try {
+                        Write-Info "Cleaning up Terraform state..."
+                        Remove-Item -Path ".terraform", ".terraform.lock.hcl", "terraform.tfstate*", "terraform-lab-output" -Recurse -Force -ErrorAction SilentlyContinue
+                        Write-Success "Exercise has been reset!"
+                    } finally {
+                        Pop-Location
+                    }
+                } else {
+                    Write-Info "Reset cancelled."
+                }
+            }
+            8 { return }
         }
         
-        if ($choice -ne 7) {
+        if ($choice -ne 8) {
             Write-Host ""
             Read-Host "Press Enter to continue"
         }
@@ -677,6 +832,11 @@ function Show-ExerciseHelp {
 }
 
 function Save-Progress {
+    # Ensure the directory exists
+    $progressDir = Split-Path $script:ProgressFile -Parent
+    if (-not (Test-Path $progressDir)) {
+        New-Item -ItemType Directory -Path $progressDir -Force | Out-Null
+    }
     $script:Progress | ConvertTo-Json | Set-Content $script:ProgressFile
 }
 
@@ -690,6 +850,31 @@ function Load-Progress {
         } catch {
             Write-Warning "Could not load progress. Starting fresh."
         }
+    }
+}
+
+function Reset-LabProgress {
+    Write-Warning "This will reset all your progress and start fresh."
+    $confirm = Read-Host "Are you sure? (yes/no)"
+    
+    if ($confirm -eq "yes") {
+        # Reset in-memory progress
+        $script:Progress = @{
+            UserName = ""
+            CompletedExercises = @()
+            TotalScore = 0
+        }
+        
+        # Delete progress file
+        if (Test-Path $script:ProgressFile) {
+            Remove-Item $script:ProgressFile -Force
+            Write-Success "Progress file deleted: $script:ProgressFile"
+        }
+        
+        Write-Success "Progress has been reset!"
+        Write-Info "You can now start fresh with any exercise."
+    } else {
+        Write-Info "Reset cancelled."
     }
 }
 
@@ -783,6 +968,7 @@ function Show-MainMenu {
         $options = $exerciseOptions + @(
             "View Progress and Statistics",
             "Help and Documentation",
+            "Reset Progress (Start Fresh)",
             "Exit Lab"
         )
         
@@ -797,7 +983,8 @@ function Show-MainMenu {
             switch ($menuChoice) {
                 0 { Show-ProgressStats }
                 1 { Show-GeneralHelp }
-                2 { 
+                2 { Reset-LabProgress }
+                3 { 
                     Write-Info "Thank you for using the Terraform Learning Lab!"
                     Write-Host "Keep practicing and happy Terraforming!" -ForegroundColor Green
                     return 
@@ -819,6 +1006,11 @@ function Main {
     Load-Progress
     
     # Handle command line parameters
+    if ($ResetProgress) {
+        Reset-LabProgress
+        return
+    }
+    
     if ($ShowStats) {
         Show-ProgressStats
         return

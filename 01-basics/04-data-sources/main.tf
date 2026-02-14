@@ -28,7 +28,7 @@ variable "config_file_name" {
 # This simulates existing infrastructure or configuration files
 
 resource "local_file" "app_config" {
-  filename = "${path.module}/data/${var.config_file_name}"
+  filename = "./terraform-lab-output/data/${var.config_file_name}"
   content = jsonencode({
     application = {
       name    = var.project_name
@@ -55,7 +55,7 @@ resource "local_file" "app_config" {
 }
 
 resource "local_file" "server_list" {
-  filename = "${path.module}/data/servers.csv"
+  filename = "./terraform-lab-output/data/servers.csv"
   content = <<-EOF
     hostname,ip_address,role,environment,status
     web-01,10.0.1.10,webserver,development,active
@@ -67,7 +67,7 @@ resource "local_file" "server_list" {
 }
 
 resource "local_file" "secrets_template" {
-  filename = "${path.module}/data/secrets.env"
+  filename = "./terraform-lab-output/data/secrets.env"
   content = <<-EOF
     # Environment secrets template
     DB_PASSWORD=changeme123
@@ -79,7 +79,7 @@ resource "local_file" "secrets_template" {
 
 # Create a directory listing file
 resource "local_file" "directory_manifest" {
-  filename = "${path.module}/data/manifest.txt"
+  filename = "./terraform-lab-output/data/manifest.txt"
   content = <<-EOF
     # Directory contents for ${var.project_name}
     ${var.config_file_name}
@@ -162,7 +162,7 @@ locals {
 
 # Create new resources based on the data we read
 resource "local_file" "processed_config" {
-  filename = "${path.module}/output/processed-config.json"
+  filename = "./terraform-lab-output/processed-config.json"
   content = jsonencode({
     # Use data from the existing config
     source_application = local.app_config.application.name
@@ -204,7 +204,7 @@ resource "local_file" "processed_config" {
 resource "local_file" "server_configs" {
   for_each = local.active_servers
   
-  filename = "${path.module}/output/server-${each.key}.conf"
+  filename = "./terraform-lab-output/servers/server-${each.key}.conf"
   content = <<-EOF
     # Server configuration for ${each.value.hostname}
     # Generated from data source: ${data.local_file.server_inventory.filename}
@@ -293,6 +293,87 @@ output "processed_data" {
     
     generated_files = length(local.active_servers) + 1  # server configs + processed config
   }
+}
+
+# Create a PowerShell comparison file to help understand data sources
+resource "local_file" "powershell_comparison" {
+  filename = "./terraform-lab-output/terraform-vs-powershell-datasources.ps1"
+  content  = <<-EOT
+    # PowerShell Equivalent of Terraform Data Sources
+    # ================================================
+    # This shows how Terraform data sources compare to PowerShell commands
+    
+    Write-Host "=== Terraform Data Sources vs PowerShell Commands ===" -ForegroundColor Green
+    
+    # TERRAFORM DATA SOURCE:
+    # data "local_file" "existing_config" {
+    #   filename = "./config.json"
+    # }
+    
+    # POWERSHELL EQUIVALENT:
+    $existingConfig = Get-Content -Path "./config.json" -Raw
+    $configData = $existingConfig | ConvertFrom-Json
+    
+    Write-Host "`nReading JSON Configuration (like Terraform data source):" -ForegroundColor Yellow
+    Write-Host "App Name: $($configData.application.name)"
+    Write-Host "Version: $($configData.application.version)"
+    
+    # TERRAFORM: Reading CSV data
+    # data "local_file" "server_inventory" { ... }
+    
+    # POWERSHELL EQUIVALENT:
+    $servers = Import-Csv -Path "./servers.csv"
+    $activeServers = $servers | Where-Object { $_.status -eq "active" }
+    
+    Write-Host "`nActive Servers (filtered from CSV):" -ForegroundColor Yellow
+    $activeServers | ForEach-Object {
+        Write-Host "  - $($_.hostname): $($_.ip_address) [$($_.role)]"
+    }
+    
+    # TERRAFORM: Processing environment variables
+    # locals { environment_vars = { ... } }
+    
+    # POWERSHELL EQUIVALENT:
+    $envContent = Get-Content -Path "./secrets.env"
+    $envVars = @{}
+    $envContent | Where-Object { $_ -notmatch '^#' -and $_ -match '=' } | ForEach-Object {
+        $parts = $_ -split '=', 2
+        $envVars[$parts[0]] = $parts[1]
+    }
+    
+    Write-Host "`nEnvironment Variables:" -ForegroundColor Yellow
+    $envVars.GetEnumerator() | ForEach-Object {
+        Write-Host "  $($_.Key) = [HIDDEN]"  # Don't display actual secrets
+    }
+    
+    # KEY DIFFERENCES:
+    Write-Host "`n=== Key Differences ===" -ForegroundColor Magenta
+    Write-Host @"
+    1. DECLARATIVE vs IMPERATIVE:
+       - Terraform: Declares what data to read
+       - PowerShell: Explicitly reads and processes data
+    
+    2. DEPENDENCY MANAGEMENT:
+       - Terraform: Automatic dependency resolution
+       - PowerShell: Manual ordering of commands
+    
+    3. STATE AWARENESS:
+       - Terraform: Tracks when data changes
+       - PowerShell: Re-reads every execution
+    
+    4. ERROR HANDLING:
+       - Terraform: Fails if data source missing
+       - PowerShell: Can use -ErrorAction for control
+    
+    5. COMMON PATTERNS:
+       Terraform data.type.name  ->  PowerShell Get-* cmdlets
+       data.local_file           ->  Get-Content
+       data.http                 ->  Invoke-WebRequest
+       data.archive_file         ->  Expand-Archive
+    "@
+    
+    Write-Host "`nYour PowerShell skills directly apply to understanding Terraform data sources!" -ForegroundColor Green
+  EOT
 }
 
 # Sensitive output showing environment variables (be careful with secrets!)

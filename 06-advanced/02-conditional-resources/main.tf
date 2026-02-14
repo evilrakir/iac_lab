@@ -121,7 +121,7 @@ locals {
 resource "local_file" "monitoring_config" {
   count = var.enable_monitoring ? 1 : 0
   
-  filename = "${path.module}/output/monitoring.yaml"
+  filename = "./terraform-lab-output/monitoring.yaml"
   content = yamlencode({
     enabled = true
     environment = var.environment
@@ -141,7 +141,7 @@ resource "local_file" "monitoring_config" {
 resource "local_file" "backup_configs" {
   count = var.enable_backups ? local.env_config.replicas : 0
   
-  filename = "${path.module}/output/backups/backup-${count.index}.conf"
+  filename = "./terraform-lab-output/backups/backup-${count.index}.conf"
   content = <<-EOT
     # Backup Configuration ${count.index + 1}
     ENABLED=true
@@ -163,7 +163,7 @@ resource "local_file" "feature_configs" {
     feature => enabled if enabled
   }
   
-  filename = "${path.module}/output/features/${each.key}.json"
+  filename = "./terraform-lab-output/features/${each.key}.json"
   content = jsonencode({
     feature = each.key
     enabled = each.value
@@ -199,7 +199,7 @@ resource "local_file" "feature_configs" {
 # ========================================================================
 
 resource "local_file" "application_config" {
-  filename = "${path.module}/output/app-config.json"
+  filename = "./terraform-lab-output/app-config.json"
   
   # Conditional content based on environment and features
   content = jsonencode({
@@ -255,7 +255,7 @@ resource "local_file" "application_config" {
 resource "local_file" "instance_configs" {
   count = local.actual_instance_count
   
-  filename = "${path.module}/output/instances/instance-${count.index}.yaml"
+  filename = "./terraform-lab-output/instances/instance-${count.index}.yaml"
   content = yamlencode({
     instance = {
       id = count.index
@@ -305,7 +305,7 @@ resource "local_file" "monitoring_stack" {
     "alertmanager" = { port = 9093, retention = "7d" }
   } : {}
   
-  filename = "${path.module}/output/monitoring-stack/${each.key}.conf"
+  filename = "./terraform-lab-output/monitoring-stack/${each.key}.conf"
   content = <<-EOT
     # ${each.key} Configuration
     SERVICE=${each.key}
@@ -324,7 +324,7 @@ resource "local_file" "backup_stack" {
     "validator" = { interval = "24h", type = "checksum" }
   } : {}
   
-  filename = "${path.module}/output/backup-stack/${each.key}.yaml"
+  filename = "./terraform-lab-output/backup-stack/${each.key}.yaml"
   content = yamlencode({
     service = each.key
     config = each.value
@@ -338,7 +338,7 @@ resource "local_file" "backup_stack" {
 # ========================================================================
 
 resource "local_file" "load_balancer_config" {
-  filename = "${path.module}/output/load-balancer.conf"
+  filename = "./terraform-lab-output/load-balancer.conf"
   
   content = <<-EOT
     # Load Balancer Configuration
@@ -386,7 +386,7 @@ resource "local_file" "load_balancer_config" {
 
 # Resource that depends on conditional resources
 resource "local_file" "deployment_summary" {
-  filename = "${path.module}/output/DEPLOYMENT_SUMMARY.md"
+  filename = "./terraform-lab-output/DEPLOYMENT_SUMMARY.md"
   
   content = <<-EOT
     # Deployment Summary
@@ -428,6 +428,240 @@ resource "local_file" "deployment_summary" {
     local_file.monitoring_stack,
     local_file.backup_stack
   ]
+}
+
+# ========================================================================
+# POWERSHELL COMPARISON
+# ========================================================================
+
+resource "local_file" "powershell_comparison" {
+  filename = "./terraform-lab-output/terraform-vs-powershell-conditionals.ps1"
+  
+  content = <<-EOT
+    # PowerShell Equivalent of Terraform Conditional Resources
+    # =========================================================
+    # This shows how Terraform conditionals compare to PowerShell logic
+    
+    Write-Host "=== Terraform Conditionals vs PowerShell If/Switch ===" -ForegroundColor Green
+    
+    # VARIABLES (like Terraform variables)
+    $EnableMonitoring = $true
+    $Environment = "production"
+    $InstanceCount = 3
+    $Features = @{
+        logging = $true
+        metrics = $true
+        alerts = $false
+        backup = $true
+    }
+    
+    # TERRAFORM: count = var.enable_monitoring ? 1 : 0
+    # POWERSHELL EQUIVALENT:
+    Write-Host "`nConditional Resource Creation (count pattern):" -ForegroundColor Yellow
+    
+    if ($EnableMonitoring) {
+        # Create monitoring config (like count = 1)
+        $monitoringConfig = @{
+            enabled = $true
+            environment = $Environment
+            interval = if ($Environment -eq "production") { 60 } else { 300 }
+        }
+        $monitoringConfig | ConvertTo-Json | Set-Content "./terraform-lab-output/monitoring.json"
+        Write-Host "  Created monitoring config"
+    } else {
+        Write-Host "  Skipped monitoring config (disabled)"
+    }
+    
+    # TERRAFORM: count = var.instance_count
+    # POWERSHELL EQUIVALENT:
+    Write-Host "`nMultiple Resources (count with number):" -ForegroundColor Yellow
+    
+    1..$InstanceCount | ForEach-Object {
+        $instance = @{
+            id = $_
+            name = "instance-$_"
+            environment = $Environment
+            role = if ($_ -eq 1 -and $Environment -eq "production") { "primary" } else { "replica" }
+        }
+        $instance | ConvertTo-Json | Set-Content "./terraform-lab-output/instance-$_.json"
+        Write-Host "  Created instance-$_"
+    }
+    
+    # TERRAFORM: for_each with conditional
+    # POWERSHELL EQUIVALENT:
+    Write-Host "`nConditional For Each (filtered resources):" -ForegroundColor Yellow
+    
+    $Features.GetEnumerator() | Where-Object { $_.Value -eq $true } | ForEach-Object {
+        $featureConfig = @{
+            feature = $_.Key
+            enabled = $true
+            environment = $Environment
+            config = switch ($_.Key) {
+                "logging" { @{ level = "info"; retention = "30d" } }
+                "metrics" { @{ interval = 60; aggregation = "avg" } }
+                "backup" { @{ frequency = "daily"; retention = "7d" } }
+                default { @{} }
+            }
+        }
+        $featureConfig | ConvertTo-Json | Set-Content "./terraform-lab-output/feature-$($_.Key).json"
+        Write-Host "  Created feature config: $($_.Key)"
+    }
+    
+    # TERRAFORM: Conditional expressions in resource attributes
+    # POWERSHELL EQUIVALENT:
+    Write-Host "`nConditional Attributes:" -ForegroundColor Yellow
+    
+    $appConfig = @{
+        name = "conditional-demo"
+        environment = $Environment
+        
+        # Conditional values (like Terraform's condition ? true_val : false_val)
+        debug = if ($Environment -eq "development") { $true } else { $false }
+        replicas = if ($Environment -eq "production") { 3 } else { 1 }
+        
+        # Complex conditions
+        monitoring = @{
+            enabled = $EnableMonitoring
+            level = switch ($Environment) {
+                "production" { "detailed" }
+                "staging" { "standard" }
+                default { "basic" }
+            }
+        }
+        
+        # Conditional nested objects (like Terraform's dynamic blocks)
+        features = foreach ($feature in $Features.GetEnumerator()) {
+            if ($feature.Value) {
+                @{
+                    name = $feature.Key
+                    enabled = $true
+                }
+            }
+        } | Where-Object { $_ -ne $null }
+    }
+    
+    $appConfig | ConvertTo-Json -Depth 10 | Set-Content "./terraform-lab-output/app-config.json"
+    Write-Host "  Created app config with conditional attributes"
+    
+    # TERRAFORM: lookup() and try()
+    # POWERSHELL EQUIVALENT:
+    Write-Host "`nSafe Lookups and Defaults:" -ForegroundColor Yellow
+    
+    $envConfigs = @{
+        production = @{ instances = 5; monitoring = "detailed" }
+        staging = @{ instances = 2; monitoring = "standard" }
+        development = @{ instances = 1; monitoring = "basic" }
+    }
+    
+    # Safe lookup with default (like Terraform's lookup())
+    $currentConfig = if ($envConfigs.ContainsKey($Environment)) { 
+        $envConfigs[$Environment] 
+    } else { 
+        @{ instances = 1; monitoring = "basic" }
+    }
+    
+    Write-Host "  Environment config: $($currentConfig | ConvertTo-Json -Compress)"
+    
+    # Try pattern (like Terraform's try())
+    function Safe-Get {
+        param($ScriptBlock, $Default)
+        try {
+            & $ScriptBlock
+        } catch {
+            $Default
+        }
+    }
+    
+    $safeLookup = Safe-Get { $envConfigs.production.instances } 1
+    Write-Host "  Safe lookup result: $safeLookup"
+    
+    # TERRAFORM: Conditional module calls
+    # POWERSHELL EQUIVALENT:
+    Write-Host "`nConditional Function Calls (like conditional modules):" -ForegroundColor Yellow
+    
+    function Deploy-MonitoringStack {
+        Write-Host "    Deploying monitoring stack..."
+        # Implementation here
+    }
+    
+    function Deploy-BackupSystem {
+        Write-Host "    Deploying backup system..."
+        # Implementation here
+    }
+    
+    # Conditional execution
+    if ($Environment -eq "production" -or $EnableMonitoring) {
+        Deploy-MonitoringStack
+    }
+    
+    if ($Features.backup -and $Environment -ne "development") {
+        Deploy-BackupSystem
+    }
+    
+    # COMPLEX CONDITIONS
+    Write-Host "`nComplex Conditional Logic:" -ForegroundColor Yellow
+    
+    # Nested conditions (like Terraform's nested conditionals)
+    $deploymentConfig = @{
+        highAvailability = (
+            $Environment -eq "production" -and 
+            $InstanceCount -gt 1
+        )
+        
+        backupEnabled = (
+            $Features.backup -and
+            $Environment -ne "development"
+        )
+        
+        monitoringLevel = if ($Environment -eq "production") {
+            if ($EnableMonitoring) { "full" } else { "basic" }
+        } elseif ($Environment -eq "staging") {
+            "standard"
+        } else {
+            "minimal"
+        }
+    }
+    
+    Write-Host "  Deployment config: $($deploymentConfig | ConvertTo-Json -Compress)"
+    
+    # KEY DIFFERENCES:
+    Write-Host "`n=== Key Differences ===" -ForegroundColor Magenta
+    Write-Host @"
+    1. DECLARATIVE vs IMPERATIVE:
+       - Terraform: Declares desired conditional state
+       - PowerShell: Executes conditional logic procedurally
+    
+    2. RESOURCE CREATION:
+       - Terraform: count = condition ? 1 : 0
+       - PowerShell: if (condition) { create-resource }
+    
+    3. MULTIPLE RESOURCES:
+       - Terraform: count = number
+       - PowerShell: 1..number | ForEach-Object
+    
+    4. FOR EACH WITH CONDITIONS:
+       - Terraform: for_each = { for k,v in map : k => v if condition }
+       - PowerShell: $map | Where-Object { condition } | ForEach-Object
+    
+    5. CONDITIONAL EXPRESSIONS:
+       - Terraform: attribute = condition ? true_val : false_val
+       - PowerShell: attribute = if (condition) { true_val } else { false_val }
+    
+    6. NULL HANDLING:
+       - Terraform: Unset attributes are omitted
+       - PowerShell: Must explicitly handle $null values
+    
+    7. TYPE SAFETY:
+       - Terraform: Type checking at plan time
+       - PowerShell: Runtime type checking
+    
+    8. STATE TRACKING:
+       - Terraform: Tracks conditional resources in state
+       - PowerShell: No automatic state for conditions
+    "@
+    
+    Write-Host "`nTerraform's declarative conditionals ensure idempotent infrastructure!" -ForegroundColor Green
+  EOT
 }
 
 # ========================================================================
