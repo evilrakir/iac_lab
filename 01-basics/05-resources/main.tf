@@ -109,7 +109,7 @@ locals {
 
 # 1. Basic Resource Creation
 resource "local_file" "project_readme" {
-  filename = "${path.module}/infrastructure/${local.project_id}/README.md"
+  filename = "./terraform-lab-output/README.md"
   content = <<-EOF
     # ${var.project_name} Infrastructure
     
@@ -136,7 +136,7 @@ resource "local_file" "project_readme" {
 
 # 2. Resource with Dependencies (explicit)
 resource "local_file" "network_config" {
-  filename = "${path.module}/infrastructure/${local.project_id}/network.json"
+  filename = "./terraform-lab-output/network.json"
   content = jsonencode({
     project_id     = local.project_id
     network        = local.network_config
@@ -152,7 +152,7 @@ resource "local_file" "network_config" {
 resource "local_file" "server_configs" {
   count = var.server_count
   
-  filename = "${path.module}/infrastructure/${local.project_id}/servers/server-${format("%02d", count.index + 1)}.conf"
+  filename = "./terraform-lab-output/servers/server-${format("%02d", count.index + 1)}.conf"
   content = <<-EOF
     # Server Configuration ${count.index + 1}
     [server]
@@ -182,7 +182,7 @@ resource "local_file" "server_configs" {
 resource "local_file" "service_configs" {
   for_each = var.server_config
   
-  filename = "${path.module}/infrastructure/${local.project_id}/services/${each.key}.yaml"
+  filename = "./terraform-lab-output/services/${each.key}.yaml"
   content = yamlencode({
     service = {
       name = each.key
@@ -209,7 +209,7 @@ resource "local_file" "service_configs" {
 resource "local_file" "backup_config" {
   count = var.enable_backup ? 1 : 0
   
-  filename = "${path.module}/infrastructure/${local.project_id}/backup.json"
+  filename = "./terraform-lab-output/backup.json"
   content = jsonencode({
     backup = {
       enabled   = true
@@ -263,7 +263,7 @@ resource "null_resource" "infrastructure_validation" {
 
 # 7. Resource with Lifecycle Rules
 resource "local_file" "persistent_config" {
-  filename = "${path.module}/infrastructure/${local.project_id}/persistent.json"
+  filename = "./terraform-lab-output/persistent.json"
   content = jsonencode({
     config = {
       version = "1.0"
@@ -290,7 +290,7 @@ resource "local_file" "persistent_config" {
 
 # 8. Sensitive Resource (for handling sensitive data)
 resource "local_sensitive_file" "secrets" {
-  filename = "${path.module}/infrastructure/${local.project_id}/.secrets"
+  filename = "./terraform-lab-output/.secrets"
   content = jsonencode({
     database = {
       password = "super-secret-password"
@@ -305,7 +305,7 @@ resource "local_sensitive_file" "secrets" {
 
 # 9. Dynamic Blocks Example (creating multiple sub-blocks)
 resource "local_file" "load_balancer_config" {
-  filename = "${path.module}/infrastructure/${local.project_id}/load-balancer.conf"
+  filename = "./terraform-lab-output/load-balancer.conf"
   content = <<-EOF
     # Load Balancer Configuration for ${local.project_id}
     
@@ -340,7 +340,7 @@ resource "local_file" "load_balancer_config" {
 
 # 10. Data Processing Resource
 resource "local_file" "infrastructure_summary" {
-  filename = "${path.module}/infrastructure/${local.project_id}/SUMMARY.json"
+  filename = "./terraform-lab-output/SUMMARY.json"
   content = jsonencode({
     project = {
       id          = local.project_id

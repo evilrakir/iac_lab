@@ -65,7 +65,7 @@ locals {
 
 # 1. local_file - Creates and manages regular files
 resource "local_file" "app_config" {
-  filename = "${path.module}/output/app-config.json"
+  filename = "./terraform-lab-output/app-config.json"
   content = jsonencode(local.app_config)
   
   # File permissions (on Unix systems)
@@ -77,7 +77,7 @@ resource "local_file" "app_config" {
 
 # 2. local_file with direct template content
 resource "local_file" "docker_compose" {
-  filename = "${path.module}/output/docker-compose.yml"
+  filename = "./terraform-lab-output/docker-compose.yml"
   content = <<-EOT
     # Docker Compose for ${var.project_name}
     # Environment: ${var.environment}
@@ -130,7 +130,7 @@ resource "local_file" "team_member_configs" {
     for member in local.team_members : member.name => member
   }
   
-  filename = "${path.module}/output/team/${each.value.name}.yaml"
+  filename = "./terraform-lab-output/team/${each.value.name}.yaml"
   content = yamlencode({
     member = {
       id    = each.value.id
@@ -154,7 +154,7 @@ resource "local_file" "team_member_configs" {
 resource "local_sensitive_file" "secrets" {
   count = var.create_sensitive_files ? 1 : 0
   
-  filename = "${path.module}/output/.secrets.env"
+  filename = "./terraform-lab-output/.secrets.env"
   content = <<-EOT
     # Sensitive environment variables
     DATABASE_PASSWORD=super-secret-password-123
@@ -176,7 +176,7 @@ resource "local_sensitive_file" "secrets" {
 resource "local_file" "environment_configs" {
   count = 3
   
-  filename = "${path.module}/output/environments/env-${count.index + 1}.conf"
+  filename = "./terraform-lab-output/environments/env-${count.index + 1}.conf"
   content = <<-EOT
     # Environment Configuration ${count.index + 1}
     ENV_ID=${count.index + 1}
@@ -201,7 +201,7 @@ resource "local_file" "environment_configs" {
 
 # 6. Create README with provider information
 resource "local_file" "provider_readme" {
-  filename = "${path.module}/output/PROVIDER_INFO.md"
+  filename = "./terraform-lab-output/PROVIDER_INFO.md"
   content = <<-EOT
     # Local Provider Demonstration
     
@@ -270,52 +270,111 @@ resource "local_file" "provider_readme" {
   EOT
 }
 
-# 7. Create template file for docker-compose
-resource "local_file" "docker_compose_template" {
-  filename = "${path.module}/templates/docker-compose.yml.tpl"
+# 7. Create a PowerShell comparison file
+resource "local_file" "powershell_comparison" {
+  filename = "./terraform-lab-output/terraform-vs-powershell-providers.ps1"
   content = <<-EOT
-    # Docker Compose for $${project_name}
-    # Environment: $${environment}
+    # PowerShell Equivalent of Terraform Providers
+    # =============================================
+    # This shows how Terraform providers compare to PowerShell modules
     
-    version: '3.8'
+    Write-Host "=== Terraform Providers vs PowerShell Modules ===" -ForegroundColor Green
     
-    services:
-      app:
-        build: .
-        ports:
-          - "$${app_port}:8080"
-        environment:
-          - NODE_ENV=$${environment}
-          - PROJECT_NAME=$${project_name}
-        depends_on:
-          - database
-          - redis
-      
-      database:
-        image: postgres:14
-        ports:
-          - "$${db_port}:5432"
-        environment:
-          - POSTGRES_DB=$${project_name}
-          - POSTGRES_USER=app_user
-          - POSTGRES_PASSWORD=app_password
-        volumes:
-          - postgres_data:/var/lib/postgresql/data
-      
-      redis:
-        image: redis:7-alpine
-        ports:
-          - "6379:6379"
-        volumes:
-          - redis_data:/data
+    # TERRAFORM PROVIDER:
+    # terraform {
+    #   required_providers {
+    #     local = {
+    #       source  = "hashicorp/local"
+    #       version = "~> 2.4"
+    #     }
+    #   }
+    # }
     
-    volumes:
-      postgres_data:
-      redis_data:
+    # POWERSHELL EQUIVALENT:
+    # Install and import modules
+    if (!(Get-Module -ListAvailable -Name "SomeModule")) {
+        Install-Module -Name "SomeModule" -Force -Scope CurrentUser
+    }
+    Import-Module "SomeModule"
     
-    networks:
-      default:
-        name: $${project_name}-$${environment}
+    Write-Host "`nCreating Files (like Terraform local_file resource):" -ForegroundColor Yellow
+    
+    # TERRAFORM: resource "local_file" "config" { ... }
+    # POWERSHELL EQUIVALENT:
+    $config = @{
+        name = "${var.project_name}"
+        environment = "${var.environment}"
+        version = "1.0.0"
+        team_size = ${var.team_size}
+        created_at = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+    }
+    $config | ConvertTo-Json | Set-Content -Path "./terraform-lab-output/app-config.json"
+    Write-Host "  Created: app-config.json"
+    
+    # Creating multiple files with PowerShell (like Terraform count)
+    Write-Host "`nCreating Multiple Files (like Terraform count):" -ForegroundColor Yellow
+    1..3 | ForEach-Object {
+        $envConfig = @"
+    # Environment Configuration $_
+    ENV_ID=$_
+    ENV_NAME=${var.environment}-$_
+    PROJECT=${var.project_name}
+    "@
+        $envConfig | Set-Content -Path "./terraform-lab-output/environments/env-$_.conf"
+        Write-Host "  Created: env-$_.conf"
+    }
+    
+    # Creating files for each item (like Terraform for_each)
+    Write-Host "`nCreating Team Files (like Terraform for_each):" -ForegroundColor Yellow
+    $teamMembers = @{
+        "team-member-1" = @{ id = 1; role = "lead" }
+        "team-member-2" = @{ id = 2; role = "developer" }
+        "team-member-3" = @{ id = 3; role = "developer" }
+    }
+    
+    $teamMembers.GetEnumerator() | ForEach-Object {
+        $member = @{
+            name = $_.Key
+            id = $_.Value.id
+            role = $_.Value.role
+            project = "${var.project_name}"
+        }
+        $member | ConvertTo-Yaml | Set-Content -Path "./terraform-lab-output/team/$($_.Key).yaml"
+        Write-Host "  Created: $($_.Key).yaml"
+    }
+    
+    # KEY DIFFERENCES:
+    Write-Host "`n=== Key Differences ===" -ForegroundColor Magenta
+    Write-Host @"
+    1. PROVIDER vs MODULE:
+       - Terraform: Providers are plugins that define resources
+       - PowerShell: Modules provide cmdlets and functions
+    
+    2. DECLARATIVE vs IMPERATIVE:
+       - Terraform: Declares desired state of files
+       - PowerShell: Explicitly creates files with commands
+    
+    3. STATE MANAGEMENT:
+       - Terraform: Tracks file state automatically
+       - PowerShell: No built-in state tracking
+    
+    4. IDEMPOTENCY:
+       - Terraform: Automatically idempotent
+       - PowerShell: Must manually check if file exists
+    
+    5. DEPENDENCY MANAGEMENT:
+       - Terraform: Automatic dependency resolution
+       - PowerShell: Manual ordering of commands
+    
+    6. COMMON PATTERNS:
+       Terraform Provider    ->  PowerShell Module
+       resource "type"       ->  New-* or Set-* cmdlets
+       data "type"          ->  Get-* cmdlets
+       count                ->  1..n | ForEach-Object
+       for_each             ->  $hash.GetEnumerator() | ForEach-Object
+    "@
+    
+    Write-Host "`nYour PowerShell skills directly apply to understanding Terraform providers!" -ForegroundColor Green
   EOT
 }
 
@@ -346,7 +405,7 @@ output "provider_summary" {
       length(local_file.team_member_configs) +
       length(local_file.environment_configs) +
       (var.create_sensitive_files ? 1 : 0) +
-      2    # readme + template
+      2    # readme + powershell comparison
     )
   }
 }

@@ -1,5 +1,10 @@
-# Exercise 2: Variables - Input and Local Values
-# Learn how to use variables, locals, and validation in Terraform
+# ╔════════════════════════════════════════════════════════════════════╗
+# ║  TERRAFORM VARIABLES LAB - USING VARIABLES IN PRACTICE              ║
+# ║  Learn how to use variables, locals, and loops in resources         ║
+# ╚════════════════════════════════════════════════════════════════════╝
+
+# BEST PRACTICE: Variable definitions go in variables.tf
+# This file (main.tf) contains the actual resource configurations
 
 terraform {
   required_providers {
@@ -11,205 +16,283 @@ terraform {
   required_version = ">= 1.0"
 }
 
-# Simple string variable
-variable "project_name" {
-  description = "Name of the project"
-  type        = string
-  default     = "terraform-lab"
-}
+# ========================================================================
+# LOCAL VALUES - Computed from Variables
+# ========================================================================
+# Locals are like PowerShell variables calculated from other values
+# They're computed once and can be referenced throughout your config
 
-# Variable with validation
-variable "environment" {
-  description = "Deployment environment"
-  type        = string
-  default     = "development"
-  
-  validation {
-    condition     = contains(["development", "staging", "production"], var.environment)
-    error_message = "Environment must be development, staging, or production."
-  }
-}
-
-# Number variable with validation
-variable "instance_count" {
-  description = "Number of instances to create"
-  type        = number
-  default     = 2
-  
-  validation {
-    condition     = var.instance_count > 0 && var.instance_count <= 10
-    error_message = "Instance count must be between 1 and 10."
-  }
-}
-
-# Boolean variable
-variable "enable_monitoring" {
-  description = "Enable monitoring features"
-  type        = bool
-  default     = true
-}
-
-# List variable
-variable "availability_zones" {
-  description = "List of availability zones"
-  type        = list(string)
-  default     = ["us-east-1a", "us-east-1b", "us-east-1c"]
-}
-
-# Map variable
-variable "tags" {
-  description = "Resource tags"
-  type        = map(string)
-  default = {
-    Owner       = "DevOps Team"
-    Environment = "Lab"
-    ManagedBy   = "Terraform"
-  }
-}
-
-# Object variable (complex type)
-variable "database_config" {
-  description = "Database configuration"
-  type = object({
-    engine   = string
-    version  = string
-    size     = string
-    port     = number
-    backup   = bool
-  })
-  default = {
-    engine   = "postgres"
-    version  = "14.5"
-    size     = "db.t3.micro"
-    port     = 5432
-    backup   = true
-  }
-}
-
-# Local values (computed from variables)
 locals {
-  # Construct resource prefix
+  # Simple timestamp
+  timestamp = timestamp()
+  
+  # String concatenation
   resource_prefix = "${var.project_name}-${var.environment}"
   
-  # Determine instance type based on environment
-  instance_type = var.environment == "production" ? "t3.large" : "t3.micro"
+  # Conditional logic (ternary operator)
+  instance_type = var.environment == "production" ? "t2.large" : "t2.micro"
   
-  # Merge tags with environment-specific tags
-  complete_tags = merge(
-    var.tags,
-    {
-      Environment = var.environment
-      Project     = var.project_name
-      Timestamp   = timestamp()
-    }
-  )
-  
-  # Create a map of instances with names
-  instances = {
-    for i in range(var.instance_count) : 
-    "instance-${i}" => {
-      name = "${local.resource_prefix}-${i}"
-      zone = element(var.availability_zones, i)
-      monitoring = var.enable_monitoring
-    }
-  }
-  
-  # Conditional configuration
-  backup_enabled = var.environment == "production" || var.database_config.backup
-  
-  # String manipulation
-  sanitized_name = replace(lower(var.project_name), "/[^a-z0-9-]/", "-")
-}
-
-# Using variables and locals in resources
-resource "local_file" "config" {
-  filename = "${path.module}/output/config.json"
-  content = jsonencode({
-    project = {
-      name        = var.project_name
-      environment = var.environment
-      prefix      = local.resource_prefix
-    }
-    instances = local.instances
-    database  = var.database_config
-    monitoring = {
-      enabled = var.enable_monitoring
-      backup  = local.backup_enabled
-    }
-    tags = local.complete_tags
-  })
-}
-
-# Dynamic resource creation based on variables
-resource "local_file" "instance_configs" {
-  for_each = local.instances
-  
-  filename = "${path.module}/output/instances/${each.key}.yaml"
-  content = yamlencode({
-    name = each.value.name
-    zone = each.value.zone
-    type = local.instance_type
-    monitoring = each.value.monitoring
-    tags = local.complete_tags
-  })
-}
-
-# Conditional resource creation
-resource "local_file" "monitoring_config" {
-  count = var.enable_monitoring ? 1 : 0
-  
-  filename = "${path.module}/output/monitoring.conf"
-  content = <<-EOF
-    # Monitoring Configuration
-    Project: ${var.project_name}
-    Environment: ${var.environment}
-    Enabled: ${var.enable_monitoring}
-    Backup: ${local.backup_enabled}
-    
-    # Instance Monitoring
-    %{ for name, config in local.instances ~}
-    ${name}: ${config.monitoring ? "enabled" : "disabled"}
-    %{ endfor ~}
-  EOF
-}
-
-# Using sensitive variables
-variable "api_key" {
-  description = "API key for external service"
-  type        = string
-  sensitive   = true
-  default     = "secret-api-key"
-}
-
-resource "local_sensitive_file" "api_config" {
-  filename = "${path.module}/output/.api_config"
-  content = jsonencode({
-    api_key = var.api_key
-    project = var.project_name
-  })
-}
-
-# Output examples
-output "project_info" {
-  description = "Project information"
-  value = {
-    name        = var.project_name
+  # Complex object combining multiple variables
+  full_config = {
+    name        = local.resource_prefix
     environment = var.environment
-    prefix      = local.resource_prefix
+    monitoring  = var.enable_monitoring
+    tags        = merge(var.tags, {
+      CreatedAt = local.timestamp
+      Prefix    = local.resource_prefix
+    })
   }
+  
+  # Working with lists
+  zone_count   = length(var.availability_zones)
+  primary_zone = var.availability_zones[0]
+  
+  # Map transformation
+  lowercase_tags = { for k, v in var.tags : lower(k) => lower(v) }
 }
 
-output "instance_names" {
-  description = "Names of all instances"
-  value = [for inst in local.instances : inst.name]
+# ========================================================================
+# RESOURCE 1: Demonstration File with All Variables
+# ========================================================================
+# This resource creates a file showing all variable values
+
+resource "local_file" "variable_demo" {
+  filename = "./terraform-lab-output/variable-values.txt"
+  content  = templatefile("${path.module}/variable-demo.tftpl", {
+    project_name      = var.project_name
+    environment       = var.environment
+    instance_count    = var.instance_count
+    monitoring        = var.enable_monitoring
+    port              = var.port_number
+    server_name       = var.server_name
+    zones             = var.availability_zones
+    zone_count        = local.zone_count
+    primary_zone      = local.primary_zone
+    allowed_ips       = var.allowed_ips
+    tags              = var.tags
+    db_config         = var.database_config
+    server_configs    = var.server_configs
+    resource_prefix   = local.resource_prefix
+    instance_type     = local.instance_type
+    timestamp         = local.timestamp
+    custom_domain     = var.custom_domain
+    backup_retention  = var.backup_retention_days
+    debug_enabled     = var.enable_debug
+    backups_enabled   = var.enable_backups
+    ssl_enabled       = var.enable_ssl
+  })
 }
 
-output "database_endpoint" {
-  description = "Database connection string"
-  value = "${var.database_config.engine}://${local.resource_prefix}.example.com:${var.database_config.port}"
+# ========================================================================
+# RESOURCE 2: Multiple Files Using Count
+# ========================================================================
+# Count creates multiple instances of a resource based on a number
+
+resource "local_file" "instance_configs" {
+  count    = var.instance_count
+  filename = "./terraform-lab-output/instances/instance-${count.index}.yaml"
+  
+  content = yamlencode({
+    instance = {
+      id          = count.index + 1
+      name        = "${local.resource_prefix}-instance-${count.index + 1}"
+      environment = var.environment
+      type        = local.instance_type
+      zone        = var.availability_zones[count.index % length(var.availability_zones)]
+      monitoring  = var.enable_monitoring
+      tags        = var.tags
+    }
+  })
 }
 
-output "monitoring_enabled" {
-  description = "Whether monitoring is enabled"
-  value = var.enable_monitoring
+# ========================================================================
+# RESOURCE 3: Files Using For_Each with List
+# ========================================================================
+# For_each creates resources for each item in a collection
+
+resource "local_file" "server_files" {
+  # Convert list to map for for_each
+  for_each = { for server in var.server_configs : server.name => server }
+  
+  filename = "./terraform-lab-output/servers/${each.value.name}.conf"
+  content  = <<-EOT
+    # Server Configuration: ${each.value.name}
+    # Generated by Terraform on ${local.timestamp}
+    
+    [server]
+    name = "${each.value.name}"
+    role = "${each.value.role}"
+    size = "${each.value.size}"
+    environment = "${var.environment}"
+    monitoring_enabled = ${var.enable_monitoring}
+    ssl_enabled = ${var.enable_ssl}
+    debug_mode = ${var.enable_debug}
+    
+    [network]
+    port = ${var.port_number}
+    allowed_ips = ${join(",", var.allowed_ips)}
+    
+    [database]
+    engine = "${var.database_config.engine}"
+    version = "${var.database_config.version}"
+    port = ${var.database_config.port}
+    backup_enabled = ${var.database_config.backup}
+    replicas = ${var.database_config.replicas}
+    
+    [tags]
+    %{ for key, value in var.tags ~}
+    ${lower(key)} = "${value}"
+    %{ endfor ~}
+  EOT
 }
+
+# ========================================================================
+# RESOURCE 4: Conditional Resource Creation
+# ========================================================================
+# Use count with a conditional to create resources only when needed
+
+resource "local_file" "monitoring_config" {
+  count    = var.enable_monitoring ? 1 : 0
+  filename = "./terraform-lab-output/monitoring.conf"
+  
+  content = jsonencode({
+    monitoring = {
+      enabled     = true
+      environment = var.environment
+      project     = var.project_name
+      debug       = var.enable_debug
+    }
+    alerts = {
+      critical_threshold = var.environment == "production" ? 95 : 80
+      warning_threshold  = var.environment == "production" ? 85 : 70
+      email_enabled      = var.environment == "production" ? true : false
+    }
+    targets = [
+      for i in range(var.instance_count) : {
+        name = "${local.resource_prefix}-instance-${i + 1}"
+        zone = var.availability_zones[i % length(var.availability_zones)]
+        port = var.port_number
+      }
+    ]
+  })
+}
+
+# ========================================================================
+# RESOURCE 5: Backup Configuration (Conditional on Multiple Variables)
+# ========================================================================
+
+resource "local_file" "backup_config" {
+  count = var.enable_backups && var.backup_retention_days != null ? 1 : 0
+  
+  filename = "./terraform-lab-output/backup.yaml"
+  content = yamlencode({
+    backup_policy = {
+      enabled        = var.enable_backups
+      retention_days = var.backup_retention_days
+      environment    = var.environment
+      databases = {
+        engine            = var.database_config.engine
+        backup_enabled    = var.database_config.backup
+        replica_count     = var.database_config.replicas
+        backup_windows    = var.environment == "production" ? ["02:00-04:00"] : ["00:00-06:00"]
+        backup_frequency  = var.environment == "production" ? "hourly" : "daily"
+      }
+    }
+  })
+}
+
+# ========================================================================
+# RESOURCE 6: PowerShell Comparison Script
+# ========================================================================
+# Generate a PowerShell script showing equivalent concepts
+
+resource "local_file" "powershell_comparison" {
+  filename = "./terraform-lab-output/terraform-vs-powershell-variables.ps1"
+  content  = <<-EOT
+    # PowerShell Equivalent of Terraform Variables Demo
+    # ==================================================
+    # This script shows how Terraform concepts map to PowerShell
+    
+    # Terraform variables are like PowerShell parameters
+    param(
+        # String variable with validation
+        [ValidateSet("development", "staging", "production")]
+        [string]$Environment = "${var.environment}",
+        
+        # Number with range validation
+        [ValidateRange(1, 10)]
+        [int]$InstanceCount = ${var.instance_count},
+        
+        # Boolean parameter (switch in PowerShell)
+        [bool]$EnableMonitoring = $${var.enable_monitoring ? "true" : "false"},
+        
+        # Array parameter
+        [string[]]$AvailabilityZones = @(${join(", ", formatlist("\"%s\"", var.availability_zones))}),
+        
+        # Hashtable parameter (like Terraform map)
+        [hashtable]$Tags = @{
+            ${join("\n            ", [for k, v in var.tags : "${k} = \"${v}\""])}
+        },
+        
+        # Custom object (like Terraform object type)
+        [PSCustomObject]$DatabaseConfig = [PSCustomObject]@{
+            Engine   = "${var.database_config.engine}"
+            Version  = "${var.database_config.version}"
+            Port     = ${var.database_config.port}
+            Backup   = $${var.database_config.backup ? "true" : "false"}
+            Replicas = ${var.database_config.replicas}
+        }
+    )
+    
+    # Terraform locals are like PowerShell calculated variables
+    $ResourcePrefix = "$($Environment)-$(Get-Date -Format 'yyyyMMdd')"
+    $InstanceType = if ($Environment -eq "production") { "t2.large" } else { "t2.micro" }
+    
+    # Display configuration (like Terraform outputs)
+    Write-Host "=== Configuration Summary ===" -ForegroundColor Green
+    Write-Host "Environment: $Environment" -ForegroundColor Yellow
+    Write-Host "Resource Prefix: $ResourcePrefix" -ForegroundColor Yellow
+    Write-Host "Instance Type: $InstanceType" -ForegroundColor Yellow
+    Write-Host "Instance Count: $InstanceCount" -ForegroundColor Yellow
+    Write-Host "Monitoring: $(if ($EnableMonitoring) { 'Enabled' } else { 'Disabled' })" -ForegroundColor Yellow
+    
+    Write-Host "`nAvailability Zones:" -ForegroundColor Cyan
+    $AvailabilityZones | ForEach-Object { Write-Host "  - $_" }
+    
+    Write-Host "`nTags:" -ForegroundColor Cyan
+    $Tags.GetEnumerator() | ForEach-Object { Write-Host "  $($_.Key): $($_.Value)" }
+    
+    Write-Host "`nDatabase Configuration:" -ForegroundColor Cyan
+    $DatabaseConfig | Format-List
+    
+    # Key differences explained
+    Write-Host "`n=== Key Differences ===" -ForegroundColor Magenta
+    Write-Host @"
+    1. DECLARATIVE vs IMPERATIVE:
+       - Terraform: Describes desired state
+       - PowerShell: Executes commands step-by-step
+    
+    2. STATE MANAGEMENT:
+       - Terraform: Automatically tracks state
+       - PowerShell: Manual state tracking needed
+    
+    3. IDEMPOTENCY:
+       - Terraform: Built-in (apply multiple times safely)
+       - PowerShell: Must implement manually
+    
+    4. VALIDATION:
+       - Terraform: validation blocks with custom error messages
+       - PowerShell: Parameter attributes like [ValidateSet]
+    
+    5. TYPE SYSTEM:
+       - Terraform: Strict typing with complex types (object, tuple)
+       - PowerShell: Dynamic typing with type accelerators
+    "@
+  EOT
+}
+
+# ========================================================================
+# RESOURCE 7: Template File Demonstration
+# ========================================================================
+# The template file is now a static file: variable-demo.tftpl
+# It's used by the templatefile() function in the variable_demo resource above

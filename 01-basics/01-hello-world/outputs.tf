@@ -1,0 +1,109 @@
+# ╔════════════════════════════════════════════════════════════════════╗
+# ║  TERRAFORM OUTPUTS - EXPORTING VALUES FROM YOUR CONFIGURATION     ║
+# ║  Learn how to expose data after Terraform runs                    ║
+# ╚════════════════════════════════════════════════════════════════════╝
+
+# WHAT ARE OUTPUTS?
+# =================
+# Outputs are VALUES that Terraform displays after running 'apply'
+# Think of them as:
+#   - Return values from your infrastructure
+#   - Data to share with other configurations
+#   - Information for users or scripts
+#
+# PowerShell equivalent: return $value or Write-Output $value
+
+# Basic string output
+output "lab_directory_path" {
+  description = "Path to the created lab directory"
+  value       = var.lab_path
+}
+
+# Output with sensitive data (like PowerShell SecureString)
+output "welcome_file_path" {
+  description = "Path to the welcome file"
+  value       = local_file.welcome_file.filename
+  sensitive   = false
+}
+
+# Output with computed values
+output "files_created" {
+  description = "List of files created by Terraform"
+  value = [
+    local_file.welcome_file.filename,
+    local_file.terraform_concepts_ps1.filename,
+    local_file.terraform_example_tf.filename
+  ]
+}
+
+# Output with conditional logic
+output "backup_status" {
+  description = "Status of backup creation"
+  value       = var.create_backup ? "Backup files will be created" : "No backup files created"
+}
+
+# Output with object structure (like PowerShell custom objects)
+output "lab_summary" {
+  description = "Summary of the lab configuration"
+  value = {
+    directory_path = var.lab_path
+    student_name   = var.student_name
+    environment    = var.environment
+    file_count     = var.file_count
+    file_types     = var.file_types
+    metadata       = var.metadata
+    lab_config     = var.lab_config
+  }
+}
+
+# Output with formatting (like PowerShell formatting)
+output "lab_info_formatted" {
+  description = "Formatted lab information"
+  value = <<-EOT
+    ========================================
+    TERRAFORM LEARNING LAB SUMMARY
+    ========================================
+    Student: ${var.student_name}
+    Environment: ${var.environment}
+    Lab Path: ${var.lab_path}
+    Files Created: ${length([
+      local_file.welcome_file.filename,
+      local_file.terraform_concepts_ps1.filename,
+      local_file.terraform_example_tf.filename
+    ])}
+    File Types: ${join(", ", var.file_types)}
+    Backup Enabled: ${var.create_backup}
+    ========================================
+  EOT
+}
+
+# Output with computed attributes
+output "file_sizes" {
+  description = "Size of created files (in bytes)"
+  value = {
+    welcome_file = length(local_file.welcome_file.content)
+    concepts_script = length(local_file.terraform_concepts_ps1.content)
+    example_config = length(local_file.terraform_example_tf.content)
+  }
+}
+
+# Output with time information
+output "creation_time" {
+  description = "When the lab was created"
+  value       = timestamp()
+}
+
+# Output with validation
+output "lab_validation" {
+  description = "Validation status of the lab"
+  value = {
+    directory_exists = var.lab_path != null
+    files_created    = length([
+      local_file.welcome_file.filename,
+      local_file.terraform_concepts_ps1.filename,
+      local_file.terraform_example_tf.filename
+    ]) > 0
+    environment_valid = contains(["development", "staging", "production"], var.environment)
+    student_name_valid = length(var.student_name) > 0
+  }
+}

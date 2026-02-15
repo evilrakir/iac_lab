@@ -19,6 +19,14 @@ Welcome to the **Interactive Terraform Learning Lab** designed specifically for 
 - **💡 Smart Hints**: Get help when you're stuck
 - **✅ No Admin Required**: Learn without elevation (mostly!)
 
+## 📖 Best Practices
+
+**Important**: Please review [BEST_PRACTICES.md](BEST_PRACTICES.md) for:
+- Common issues and solutions
+- Command workflow guidelines
+- Exercise validation tips
+- Development best practices
+
 ## 🏃 Quick Start
 
 ```powershell
@@ -26,12 +34,20 @@ Welcome to the **Interactive Terraform Learning Lab** designed specifically for 
 git clone https://github.com/evilrakir/iac_lab.git
 cd iac_lab
 
-# 2. Create your personal workspace
-.\Setup-Lab.ps1
+# 2. Start the interactive lab
+.\Start-TerraformLab.ps1
 
-# 3. Start the interactive lab
-cd username-workspace
-..\Start-TerraformLab.ps1
+# View your progress
+.\Start-TerraformLab.ps1 -ShowStats
+
+# Reset all progress and start fresh
+.\Start-TerraformLab.ps1 -ResetProgress
+
+# Skip prerequisites (for testing)
+.\Start-TerraformLab.ps1 -SkipPrerequisites
+
+# Start a specific exercise
+.\Start-TerraformLab.ps1 -Exercise "01-basics/02-variables"
 ```
 
 That's it! The interactive system will guide you through everything else.

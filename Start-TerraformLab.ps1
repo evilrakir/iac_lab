@@ -12,7 +12,9 @@
 [CmdletBinding()]
 param(
     [string]$Exercise = "",
-    [switch]$ShowStats
+    [switch]$ShowStats,
+    [switch]$SkipPrerequisites,
+    [switch]$ResetProgress
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,7 +22,8 @@ $ErrorActionPreference = "Stop"
 # Configuration
 $script:LabRoot = $PSScriptRoot
 $script:TerraformPath = "C:\Tools\Terraform\terraform.exe"
-$script:ProgressFile = Join-Path $env:TEMP "terraform-lab-progress.json"
+# Store progress in user's AppData folder, not in the repo
+$script:ProgressFile = Join-Path $env:APPDATA "TerraformLab\progress.json"
 
 # Progress tracking
 $script:Progress = @{
@@ -31,35 +34,68 @@ $script:Progress = @{
 
 # Exercise definitions
 $script:Exercises = @{
+    # 01-basics - Core Terraform Concepts
     "01-basics/01-hello-world" = @{
         Name = "Hello World - Your First Terraform Configuration"
-        Description = "Learn basic Terraform syntax and create your first resources"
+        Description = "Learn basic Terraform syntax, workflow, and create your first resources"
         Prerequisites = @()
+        Difficulty = "Beginner"
     }
     "01-basics/02-variables" = @{
-        Name = "Variables and Data Types"
-        Description = "Learn how to use variables and data types in Terraform"
+        Name = "Variables and Input Values - All Types"
+        Description = "Master all variable types, validation, locals, and precedence"
         Prerequisites = @("01-basics/01-hello-world")
+        Difficulty = "Beginner"
     }
     "01-basics/03-outputs" = @{
         Name = "Outputs and Data Sharing"
-        Description = "Learn to expose and share data between Terraform configurations"
+        Description = "Learn to expose values and share data between configurations"
         Prerequisites = @("01-basics/02-variables")
+        Difficulty = "Beginner"
     }
     "01-basics/04-data-sources" = @{
-        Name = "Data Sources and File Processing"
-        Description = "Read and process external data with Terraform data sources"
+        Name = "Data Sources - Reading External Data"
+        Description = "Query existing resources and read external data files"
         Prerequisites = @("01-basics/03-outputs")
+        Difficulty = "Intermediate"
     }
     "01-basics/05-resources" = @{
-        Name = "Advanced Resource Patterns"
-        Description = "Master resource lifecycle, dependencies, and advanced patterns"
+        Name = "Resource Patterns and Dependencies"
+        Description = "Master resource lifecycle, explicit/implicit dependencies"
         Prerequisites = @("01-basics/04-data-sources")
+        Difficulty = "Intermediate"
     }
+    
+    # 02-providers - Working with Providers
     "02-providers/01-local-provider" = @{
-        Name = "Provider Concepts with Local Provider"
-        Description = "Deep dive into Terraform providers and configuration"
+        Name = "Local Provider Deep Dive"
+        Description = "Master the local provider for file and script operations"
         Prerequisites = @("01-basics/05-resources")
+        Difficulty = "Intermediate"
+    }
+    
+    # 03-modules - Reusable Infrastructure
+    "03-modules/01-simple-module" = @{
+        Name = "Your First Module"
+        Description = "Create a reusable Terraform module"
+        Prerequisites = @("02-providers/01-local-provider")
+        Difficulty = "Intermediate"
+    }
+    
+    # 04-state - State Management
+    "04-state/01-local-state" = @{
+        Name = "Understanding Terraform State"
+        Description = "Learn how Terraform tracks infrastructure state"
+        Prerequisites = @("03-modules/01-simple-module")
+        Difficulty = "Intermediate"
+    }
+    
+    # 06-advanced - Advanced Patterns
+    "06-advanced/02-conditional-resources" = @{
+        Name = "Conditional Resources and Dynamic Blocks"
+        Description = "Create resources conditionally and use dynamic blocks"
+        Prerequisites = @("04-state/01-local-state")
+        Difficulty = "Advanced"
     }
     "03-openstack/01-provider-setup" = @{
         Name = "OpenStack Provider Configuration"
@@ -161,6 +197,12 @@ function Show-Menu {
 function Test-Prerequisites {
     param([string]$ExerciseId)
     
+    # Skip prerequisite check if override is set
+    if ($script:SkipPrerequisites) {
+        Write-Warning "Skipping prerequisite check (override enabled)"
+        return $true
+    }
+    
     $exercise = $script:Exercises[$ExerciseId]
     if (-not $exercise.Prerequisites -or $exercise.Prerequisites.Count -eq 0) {
         return $true
@@ -176,18 +218,49 @@ function Test-Prerequisites {
         }
     }
     
+    if (-not $allMet) {
+        Write-Host ""
+        Write-Warning "TIP: Use -SkipPrerequisites parameter to override prerequisite check"
+    }
+    
     return $allMet
 }
 
 function Invoke-TerraformCommand {
-    param([string]$Command, [string]$WorkingDirectory)
+    param(
+        [string]$Command, 
+        [string]$WorkingDirectory,
+        [switch]$AutoApprove  # Add flag for auto-approve
+    )
     
     Push-Location $WorkingDirectory
     try {
+        # Add auto-approve if specified
+        if ($AutoApprove -and $Command -eq "apply") {
+            $Command = "apply -auto-approve"
+        }
+        
         Write-Info "Running: terraform $Command"
         Write-Host ""
         
-        $result = & $script:TerraformPath $Command.Split(' ')
+        # Handle interactive vs non-interactive commands
+        if ($Command -match "apply" -and $Command -notmatch "auto-approve") {
+            # Interactive apply - use Start-Process to properly handle confirmation prompt
+            Write-Host "Running interactive terraform apply..." -ForegroundColor Yellow
+            Write-Host "You will be prompted to confirm. Type 'yes' when asked." -ForegroundColor Cyan
+            Write-Host ""
+            
+            $process = Start-Process -FilePath $script:TerraformPath -ArgumentList $Command.Split(' ') -Wait -PassThru -NoNewWindow
+            
+            if ($process.ExitCode -eq 0) {
+                $LASTEXITCODE = 0
+            } else {
+                $LASTEXITCODE = $process.ExitCode
+            }
+        } else {
+            # Non-interactive commands - stream output directly
+            & $script:TerraformPath $Command.Split(' ')
+        }
         
         if ($LASTEXITCODE -eq 0) {
             Write-Host ""
@@ -203,18 +276,88 @@ function Invoke-TerraformCommand {
     }
 }
 
+function Mark-ExerciseCompleted {
+    param([string]$ExerciseId, [string]$WorkspacePath)
+    
+    # Default to the exercise directory
+    if (-not $WorkspacePath) {
+        $WorkspacePath = Join-Path $script:LabRoot $ExerciseId
+    }
+    
+    # Count resources in state file
+    $resourceCount = 0
+    $statePath = Join-Path $WorkspacePath "terraform.tfstate"
+    if (Test-Path $statePath) {
+        try {
+            $state = Get-Content $statePath | ConvertFrom-Json
+            if ($state.resources) {
+                $resourceCount = $state.resources.Count
+            }
+        } catch {
+            Write-Warning "Could not parse state file for resource count"
+        }
+    }
+    
+    # Create completion marker
+    $completionMarkerPath = Join-Path $WorkspacePath ".terraform-lab-completed"
+    $completionData = @{
+        ExerciseId = $ExerciseId
+        CompletedAt = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        ResourceCount = $resourceCount
+        Method = "TerraformApply"
+        LabVersion = "1.0"
+    }
+    
+    try {
+        $completionData | ConvertTo-Json | Set-Content $completionMarkerPath
+        Write-Success "Exercise marked as completed!"
+        Write-Info "Completion marker created: $completionMarkerPath"
+        return $true
+    } catch {
+        Write-Warning "Could not create completion marker: $($_.Exception.Message)"
+        return $false
+    }
+}
+
 function Test-ExerciseCompletion {
-    param([string]$ExerciseId)
+    param([string]$ExerciseId, [string]$WorkspacePath)
     
-    $exercisePath = Join-Path $script:LabRoot $ExerciseId
+    # Default to the exercise directory
+    if (-not $WorkspacePath) {
+        $WorkspacePath = Join-Path $script:LabRoot $ExerciseId
+    }
     
-    # Basic validation - check if terraform.tfstate exists and has resources
-    $statePath = Join-Path $exercisePath "terraform.tfstate"
+    # Check for completion marker file first (created when terraform apply succeeds)
+    $completionMarkerPath = Join-Path $WorkspacePath ".terraform-lab-completed"
+    if (Test-Path $completionMarkerPath) {
+        try {
+            $completionData = Get-Content $completionMarkerPath | ConvertFrom-Json
+            Write-Success "Exercise validation passed: Completed on $($completionData.CompletedAt)"
+            Write-Success "Resources created: $($completionData.ResourceCount)"
+            return $true
+        } catch {
+            Write-Warning "Could not parse completion marker file, checking state file..."
+        }
+    }
+    
+    # Fallback: Check if terraform.tfstate exists and has resources (for backward compatibility)
+    $statePath = Join-Path $WorkspacePath "terraform.tfstate"
     if (Test-Path $statePath) {
         try {
             $state = Get-Content $statePath | ConvertFrom-Json
             if ($state.resources -and $state.resources.Count -gt 0) {
-                Write-Success "Exercise validation passed: $($state.resources.Count) resources found"
+                Write-Success "Exercise validation passed: $($state.resources.Count) resources found in state"
+                
+                # Create completion marker for future validation
+                $completionData = @{
+                    ExerciseId = $ExerciseId
+                    CompletedAt = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+                    ResourceCount = $state.resources.Count
+                    Method = "StateFileValidation"
+                }
+                $completionData | ConvertTo-Json | Set-Content $completionMarkerPath
+                Write-Info "Created completion marker for future validation"
+                
                 return $true
             }
         } catch {
@@ -222,7 +365,8 @@ function Test-ExerciseCompletion {
         }
     }
     
-    Write-Warning "Exercise not yet complete - no valid Terraform state found"
+    Write-Warning "Exercise not yet complete - no completion marker or valid Terraform state found"
+    Write-Info "Complete the exercise by successfully running 'terraform apply'"
     return $false
 }
 
@@ -241,6 +385,33 @@ function Start-Exercise {
         return
     }
     
+    # Use the exercise directory directly
+    $workspacePath = $exercisePath
+    
+    # Clean up any previous Terraform state in the exercise directory
+    Push-Location $workspacePath
+    try {
+        if (Test-Path ".terraform") {
+            Write-Info "Cleaning up previous Terraform state..."
+            Remove-Item -Path ".terraform" -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        if (Test-Path ".terraform.lock.hcl") {
+            Write-Info "Removing Terraform lock file..."
+            Remove-Item -Path ".terraform.lock.hcl" -Force -ErrorAction SilentlyContinue
+        }
+        if (Test-Path "terraform.tfstate") {
+            Write-Info "Backing up existing state..."
+            $backupName = "terraform.tfstate.backup.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+            Copy-Item "terraform.tfstate" $backupName -Force
+        }
+        if (Test-Path "terraform-lab-output") {
+            Write-Info "Cleaning up previous output..."
+            Remove-Item -Path "terraform-lab-output" -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    } finally {
+        Pop-Location
+    }
+    
     Show-Header $exercise.Name $exercise.Description
     
     # Check prerequisites
@@ -250,7 +421,10 @@ function Start-Exercise {
         return
     }
     
-    Write-Host "Exercise Path: $exercisePath" -ForegroundColor Gray
+    Write-Host "Exercise Directory: $workspacePath" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Warning "Working directly in the exercise directory."
+    Write-Warning "Output files will be created in: $workspacePath\terraform-lab-output"
     Write-Host ""
     
     $ready = Read-Host "Ready to start this exercise? (Y/n)"
@@ -261,12 +435,14 @@ function Start-Exercise {
         Show-Header "Exercise: $ExerciseId" "Interactive Session"
         
         $options = @(
-            "View exercise files",
+            "GUIDED MODE: Step-by-step learning with explanations",
+            "View exercise files with explanations",
             "Initialize Terraform (terraform init)",
             "Create execution plan (terraform plan)",
             "Apply changes (terraform apply)",
             "Show current state (terraform show)",
             "Validate exercise completion",
+            "Reset this exercise (clean all state/output)",
             "Return to main menu"
         )
         
@@ -274,22 +450,335 @@ function Start-Exercise {
         
         switch ($choice) {
             0 {
-                Write-Info "Exercise files:"
-                Get-ChildItem $exercisePath -File | ForEach-Object {
-                    Write-Host "  $($_.Name)" -ForegroundColor White
+                # GUIDED MODE - Full walkthrough with explanations
+                Show-Header "GUIDED LEARNING MODE" "Step-by-step with explanations"
+                
+                Write-Host "Welcome to guided learning mode!" -ForegroundColor Green
+                Write-Host "I will explain each concept before we run commands." -ForegroundColor Green
+                Write-Host ""
+                
+                # Step 1: Understand the files
+                Write-Host "STEP 1: Understanding the Files" -ForegroundColor Yellow
+                Write-Host "================================" -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "Before running any commands, let us understand what we are working with:" -ForegroundColor White
+                Write-Host ""
+                
+                # Show main.tf with explanation
+                if (Test-Path "$exercisePath\main.tf") {
+                    Write-Host "main.tf - The Main Configuration" -ForegroundColor Cyan
+                    Write-Host "This file defines WHAT infrastructure to create." -ForegroundColor White
+                    Write-Host "Think of it like your PowerShell script that creates resources." -ForegroundColor White
+                    Write-Host ""
+                    Read-Host "Press Enter to see main.tf contents"
+                    Get-Content "$exercisePath\main.tf" | Select-Object -First 30 | ForEach-Object {
+                        Write-Host "  $_" -ForegroundColor DarkGray
+                    }
+                    Write-Host ""
                 }
+                
+                # Show variables.tf with explanation
+                if (Test-Path "$exercisePath\variables.tf") {
+                    Write-Host "variables.tf - Input Parameters" -ForegroundColor Cyan
+                    Write-Host "Like PowerShell param() blocks, these are your inputs." -ForegroundColor White
+                    Write-Host ""
+                    Read-Host "Press Enter to see variables.tf contents"
+                    Get-Content "$exercisePath\variables.tf" | Select-Object -First 20 | ForEach-Object {
+                        Write-Host "  $_" -ForegroundColor DarkGray
+                    }
+                    Write-Host ""
+                }
+                
+                Write-Host "Now let us run Terraform commands step by step..." -ForegroundColor Green
+                Write-Host ""
+                
+                # Step 2: terraform init
+                Write-Host "STEP 2: Initialize Terraform" -ForegroundColor Yellow
+                Write-Host "============================" -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "terraform init downloads providers and sets up the directory." -ForegroundColor White
+                Write-Host "Like PowerShell Install-Module, this is a one-time setup." -ForegroundColor White
+                Write-Host ""
+                Write-Host "Type the full command to initialize Terraform:" -ForegroundColor Cyan
+                Write-Host "HINT: terraform init" -ForegroundColor DarkGray
+                Write-Host ""
+                
+                do {
+                    Write-Host -NoNewline "> " -ForegroundColor Green
+                    $userCommand = Read-Host
+                    $userCommand = $userCommand.Trim()
+                    
+                    if ($userCommand -eq "terraform init" -or $userCommand -eq "terraform.exe init") {
+                        Write-Host ""
+                        Write-Success "Correct! Running terraform init..."
+                        Write-Host ""
+                        Invoke-TerraformCommand "init" $workspacePath
+                        break
+                    } elseif ($userCommand -eq "skip") {
+                        Write-Host "Skipping this step..." -ForegroundColor Yellow
+                        break
+                    } else {
+                        Write-Warning "Not quite. Type the full command: terraform init"
+                        Write-Host "You typed: '$userCommand'" -ForegroundColor Gray
+                        Write-Host "Try again or type 'skip' to skip this step" -ForegroundColor Gray
+                    }
+                } while ($true)
+                
+                # Step 3: terraform plan
+                Write-Host ""
+                Write-Host "STEP 3: Preview Changes" -ForegroundColor Yellow
+                Write-Host "=======================" -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "terraform plan shows what WILL happen without doing it." -ForegroundColor White
+                Write-Host "Like PowerShell -WhatIf parameter. Always run this first!" -ForegroundColor White
+                Write-Host ""
+                Write-Host "Type the full command to preview changes:" -ForegroundColor Cyan
+                Write-Host "HINT: terraform plan" -ForegroundColor DarkGray
+                Write-Host ""
+                
+                do {
+                    Write-Host -NoNewline "> " -ForegroundColor Green
+                    $userCommand = Read-Host
+                    $userCommand = $userCommand.Trim()
+                    
+                    if ($userCommand -eq "terraform plan" -or $userCommand -eq "terraform.exe plan") {
+                        Write-Host ""
+                        Write-Success "Correct! Running terraform plan..."
+                        Write-Host ""
+                        Invoke-TerraformCommand "plan" $workspacePath
+                        break
+                    } elseif ($userCommand -eq "skip") {
+                        Write-Host "Skipping this step..." -ForegroundColor Yellow
+                        break
+                    } else {
+                        Write-Warning "Not quite. Type the full command: terraform plan"
+                        Write-Host "You typed: '$userCommand'" -ForegroundColor Gray
+                        Write-Host "Try again or type 'skip' to skip this step" -ForegroundColor Gray
+                    }
+                } while ($true)
+                
+                # Step 4: terraform apply
+                Write-Host ""
+                Write-Host "STEP 4: Create Resources" -ForegroundColor Yellow
+                Write-Host "========================" -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "terraform apply actually creates the resources." -ForegroundColor White
+                Write-Host "After you run this command, Terraform will show the plan" -ForegroundColor Yellow
+                Write-Host "and ask for confirmation. Type 'yes' when prompted." -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "TIP: Watch for:" -ForegroundColor Cyan
+                Write-Host "  - Resources being created (green +)" -ForegroundColor White
+                Write-Host "  - The confirmation prompt (type 'yes' exactly)" -ForegroundColor White
+                Write-Host "  - Files created in terraform-lab-output folder" -ForegroundColor White
+                Write-Host ""
+                Write-Host "Type the full command to create resources:" -ForegroundColor Cyan
+                Write-Host "HINT: terraform apply" -ForegroundColor DarkGray
+                Write-Host ""
+                
+                do {
+                    Write-Host -NoNewline "> " -ForegroundColor Green
+                    $userCommand = Read-Host
+                    $userCommand = $userCommand.Trim()
+                    
+                    if ($userCommand -eq "terraform apply" -or $userCommand -eq "terraform.exe apply") {
+                        Write-Host ""
+                        Write-Success "Correct! Running terraform apply..."
+                        Write-Warning "Remember: Type 'yes' when prompted to confirm!"
+                        Write-Host ""
+                        $applySuccess = Invoke-TerraformCommand "apply" $workspacePath
+                        
+                        # Mark exercise complete if apply succeeded
+                        if ($applySuccess) {
+                            Write-Host ""
+                            # Create completion marker
+                            if (Mark-ExerciseCompleted $ExerciseId $workspacePath) {
+                                Write-Success "*** EXERCISE COMPLETED SUCCESSFULLY! ***"
+                                if ($script:Progress.CompletedExercises -notcontains $ExerciseId) {
+                                    $script:Progress.CompletedExercises += $ExerciseId
+                                    $script:Progress.TotalScore += 100
+                                    Save-Progress
+                                    Write-Success "Progress saved! Total score: $($script:Progress.TotalScore)"
+                                }
+                            }
+                        }
+                        break
+                    } elseif ($userCommand -eq "skip") {
+                        Write-Host "Skipping this step..." -ForegroundColor Yellow
+                        break
+                    } else {
+                        Write-Warning "Not quite. Type the full command: terraform apply"
+                        Write-Host "You typed: '$userCommand'" -ForegroundColor Gray
+                        Write-Host "Try again or type 'skip' to skip this step" -ForegroundColor Gray
+                    }
+                } while ($true)
+                
+                # Step 5: Show what was created
+                Write-Host ""
+                Write-Host "STEP 5: Verify What Was Created" -ForegroundColor Yellow
+                Write-Host "================================" -ForegroundColor Yellow
+                Write-Host ""
+                if (Test-Path "$workspacePath\terraform-lab-output") {
+                    Write-Host "Files created in terraform-lab-output:" -ForegroundColor Green
+                    Get-ChildItem "$workspacePath\terraform-lab-output" -File | ForEach-Object {
+                        Write-Host "  - $($_.Name)" -ForegroundColor Cyan
+                    }
+                    Write-Host ""
+                }
+                
+                Write-Host "Type the full command to see the Terraform state:" -ForegroundColor Cyan
+                Write-Host "HINT: terraform show" -ForegroundColor DarkGray
+                Write-Host ""
+                
+                do {
+                    Write-Host -NoNewline "> " -ForegroundColor Green
+                    $userCommand = Read-Host
+                    $userCommand = $userCommand.Trim()
+                    
+                    if ($userCommand -eq "terraform show" -or $userCommand -eq "terraform.exe show") {
+                        Write-Host ""
+                        Write-Success "Correct! Running terraform show..."
+                        Write-Host ""
+                        Invoke-TerraformCommand "show" $workspacePath
+                        break
+                    } elseif ($userCommand -eq "skip") {
+                        Write-Host "Skipping this step..." -ForegroundColor Yellow
+                        break
+                    } else {
+                        Write-Warning "Not quite. Type the full command: terraform show"
+                        Write-Host "You typed: '$userCommand'" -ForegroundColor Gray
+                        Write-Host "Try again or type 'skip' to skip this step" -ForegroundColor Gray
+                    }
+                } while ($true)
+                
+                # Step 6: Clean up (optional)
+                Write-Host ""
+                Write-Host "STEP 6: Clean Up Resources (Optional)" -ForegroundColor Yellow
+                Write-Host "=====================================" -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "terraform destroy removes all resources created by Terraform." -ForegroundColor White
+                Write-Host "This is like cleanup scripts in PowerShell." -ForegroundColor White
+                Write-Host ""
+                Write-Host "You can skip this if you want to keep the resources for now." -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "Type the full command to remove all resources:" -ForegroundColor Cyan
+                Write-Host "HINT: terraform destroy" -ForegroundColor DarkGray
+                Write-Host ""
+                
+                do {
+                    Write-Host -NoNewline "> " -ForegroundColor Green
+                    $userCommand = Read-Host
+                    $userCommand = $userCommand.Trim()
+                    
+                    if ($userCommand -eq "terraform destroy" -or $userCommand -eq "terraform.exe destroy") {
+                        Write-Host ""
+                        Write-Success "Correct! Running terraform destroy..."
+                        Write-Warning "Remember: Type 'yes' when prompted to confirm deletion!"
+                        Write-Host ""
+                        Invoke-TerraformCommand "destroy" $workspacePath
+                        break
+                    } elseif ($userCommand -eq "skip") {
+                        Write-Host "Skipping cleanup - resources will remain." -ForegroundColor Yellow
+                        break
+                    } else {
+                        Write-Warning "Not quite. Type the full command: terraform destroy"
+                        Write-Host "You typed: '$userCommand'" -ForegroundColor Gray
+                        Write-Host "Try again or type 'skip' to skip cleanup" -ForegroundColor Gray
+                    }
+                } while ($true)
+                
+                Write-Host ""
+                Write-Host "Guided walkthrough complete!" -ForegroundColor Green
+                Write-Host ""
+                Write-Host "You have learned the core Terraform workflow:" -ForegroundColor Yellow
+                Write-Host "  1. terraform init    - Initialize the directory" -ForegroundColor White
+                Write-Host "  2. terraform plan    - Preview changes" -ForegroundColor White
+                Write-Host "  3. terraform apply   - Create resources" -ForegroundColor White
+                Write-Host "  4. terraform show    - View current state" -ForegroundColor White
+                Write-Host "  5. terraform destroy - Remove resources" -ForegroundColor White
+                Write-Host ""
+                Write-Host "Your output files are located at:" -ForegroundColor Cyan
+                Write-Host "  $workspacePath\terraform-lab-output" -ForegroundColor White
+                Write-Host ""
+                Write-Host "Practice these commands until they become second nature!" -ForegroundColor Green
             }
-            1 { Invoke-TerraformCommand "init" $exercisePath }
-            2 { Invoke-TerraformCommand "plan" $exercisePath }
+            1 {
+                # Enhanced file viewing with content display
+                Write-Info "Exercise files in $($ExerciseId):"
+                Write-Host ""
+                
+                $tfFiles = Get-ChildItem $exercisePath -File -Filter "*.tf" | Sort-Object Name
+                
+                foreach ($file in $tfFiles) {
+                    Write-Host "FILE: $($file.Name)" -ForegroundColor Yellow
+                    Write-Host ("-" * 50) -ForegroundColor DarkGray
+                    
+                    # Show first 20 lines with comments highlighted
+                    $content = Get-Content $file.FullName | Select-Object -First 20
+                    $lineNum = 1
+                    foreach ($line in $content) {
+                        if ($line -match "^#") {
+                            # Comment line - show in gray
+                            Write-Host "  ${lineNum}: $line" -ForegroundColor DarkGray
+                        } elseif ($line -match "^(resource|variable|output|terraform|provider)") {
+                            # Terraform keywords - highlight
+                            Write-Host "  ${lineNum}: $line" -ForegroundColor Cyan
+                        } else {
+                            Write-Host "  ${lineNum}: $line" -ForegroundColor White
+                        }
+                        $lineNum++
+                    }
+                    
+                    $totalLines = (Get-Content $file.FullName).Count
+                    if ($totalLines -gt 20) {
+                        $moreLines = $totalLines - 20
+                        Write-Host "  ... [$moreLines more lines]" -ForegroundColor DarkGray
+                    }
+                    Write-Host ""
+                }
+                
+                Write-Host "TIP: Read the comments in each file as they explain the concepts!" -ForegroundColor Green
+            }
+            2 { Invoke-TerraformCommand "init" $workspacePath }
             3 { 
+                # Check if providers are initialized before plan
+                if (-not (Test-Path "$workspacePath\.terraform")) {
+                    Write-Warning "Terraform not initialized. Running terraform init first..."
+                    Invoke-TerraformCommand "init" $workspacePath
+                    Write-Host ""
+                }
+                Invoke-TerraformCommand "plan" $workspacePath 
+            }
+            4 { 
                 Write-Warning "This will create resources. Continue? (y/N)"
                 if ((Read-Host) -eq 'y') {
-                    Invoke-TerraformCommand "apply -auto-approve" $exercisePath
+                    # Check if providers are initialized
+                    if (-not (Test-Path "$workspacePath\.terraform")) {
+                        Write-Warning "Terraform not initialized. Running terraform init first..."
+                        Invoke-TerraformCommand "init" $workspacePath
+                        Write-Host ""
+                    }
+                    $applySuccess = Invoke-TerraformCommand "apply -auto-approve" $workspacePath
+                    
+                    # Mark exercise complete if apply succeeded
+                    if ($applySuccess) {
+                        Write-Host ""
+                        if (Mark-ExerciseCompleted $ExerciseId $workspacePath) {
+                            Write-Success "Exercise marked as completed!"
+                        }
+                    }
                 }
             }
-            4 { Invoke-TerraformCommand "show" $exercisePath }
-            5 {
-                if (Test-ExerciseCompletion $ExerciseId) {
+            5 { 
+                # Check if providers are initialized before show
+                if (-not (Test-Path "$workspacePath\.terraform")) {
+                    Write-Warning "Terraform not initialized. Running terraform init first..."
+                    Invoke-TerraformCommand "init" $workspacePath
+                    Write-Host ""
+                }
+                Invoke-TerraformCommand "show" $workspacePath 
+            }
+            6 {
+                if (Test-ExerciseCompletion $ExerciseId $workspacePath) {
                     Write-Success "*** EXERCISE COMPLETED! ***"
                     if ($script:Progress.CompletedExercises -notcontains $ExerciseId) {
                         $script:Progress.CompletedExercises += $ExerciseId
@@ -302,17 +791,34 @@ function Start-Exercise {
                         if ($nextExercise) {
                             Write-Info "Ready for the next challenge? Try: $($script:Exercises[$nextExercise].Name)"
                         } else {
-                            Write-Success "Congratulations! You've completed all available exercises!"
+                            Write-Success "Congratulations! You have completed all available exercises!"
                         }
                     }
                 } else {
                     Show-ExerciseHelp $ExerciseId
                 }
             }
-            6 { return }
+            7 {
+                # Reset this exercise
+                Write-Warning "This will clean up all state and output for this exercise."
+                $confirm = Read-Host "Are you sure? (yes/no)"
+                if ($confirm -eq "yes") {
+                    Push-Location $workspacePath
+                    try {
+                        Write-Info "Cleaning up Terraform state..."
+                        Remove-Item -Path ".terraform", ".terraform.lock.hcl", "terraform.tfstate*", "terraform-lab-output" -Recurse -Force -ErrorAction SilentlyContinue
+                        Write-Success "Exercise has been reset!"
+                    } finally {
+                        Pop-Location
+                    }
+                } else {
+                    Write-Info "Reset cancelled."
+                }
+            }
+            8 { return }
         }
         
-        if ($choice -ne 6) {
+        if ($choice -ne 8) {
             Write-Host ""
             Read-Host "Press Enter to continue"
         }
@@ -337,60 +843,25 @@ function Show-ExerciseHelp {
     param([string]$ExerciseId)
     
     Write-Host ""
-    Write-Host "HELP & TROUBLESHOOTING" -ForegroundColor Yellow
+    Write-Host "HELP AND TROUBLESHOOTING" -ForegroundColor Yellow
     Write-Host "======================" -ForegroundColor Yellow
-    
-    switch ($ExerciseId) {
-        "01-basics/01-hello-world" {
-            Write-Host @"
-
-GETTING STARTED:
-1. Initialize Terraform: Choose option 2 (terraform init)
-2. Preview changes: Choose option 3 (terraform plan)
-3. Apply configuration: Choose option 4 (terraform apply)
-4. Validate completion: Choose option 6
-
-TROUBLESHOOTING:
-• If 'terraform init' fails: Check internet connection
-• If 'terraform plan' fails: Review .tf files for syntax errors
-• If 'terraform apply' fails: Check file permissions
-
-LEARNING TIPS:
-• Compare Terraform syntax to PowerShell - notice similarities!
-• Examine the created files in terraform-lab-output/
-• Run the created PowerShell script to see concept comparisons
-
-"@ -ForegroundColor White
-        }
-        "01-basics/02-variables" {
-            Write-Host @"
-
-GETTING STARTED:
-1. Look at variables.tf to see variable definitions
-2. Notice how variables are used in main.tf
-3. Run through init -> plan -> apply sequence
-4. Check the outputs to see variable usage
-
-TROUBLESHOOTING:
-• Variable errors: Check data types and validation rules
-• File path issues: Variables control file locations
-• Missing outputs: Ensure all resources created successfully
-
-LEARNING TIPS:
-• Variables in Terraform = Parameters in PowerShell
-• Locals in Terraform = Variables in PowerShell
-• Try changing default values and re-running
-
-"@ -ForegroundColor White
-        }
-        default {
-            Write-Host "General help available. Follow the step-by-step process:" -ForegroundColor White
-            Write-Host "1. Initialize -> 2. Plan -> 3. Apply -> 4. Validate" -ForegroundColor Cyan
-        }
-    }
+    Write-Host ""
+    Write-Host "Follow this process:" -ForegroundColor White
+    Write-Host "  1. Choose GUIDED MODE (option 1) for step-by-step learning" -ForegroundColor Green
+    Write-Host "  2. Or manually: Initialize -> Plan -> Apply -> Validate" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "TIPS:" -ForegroundColor Yellow
+    Write-Host "  - Read the comments in the .tf files" -ForegroundColor White
+    Write-Host "  - Compare Terraform syntax to PowerShell" -ForegroundColor White
+    Write-Host "  - Check terraform-lab-output folder after apply" -ForegroundColor White
 }
 
 function Save-Progress {
+    # Ensure the directory exists
+    $progressDir = Split-Path $script:ProgressFile -Parent
+    if (-not (Test-Path $progressDir)) {
+        New-Item -ItemType Directory -Path $progressDir -Force | Out-Null
+    }
     $script:Progress | ConvertTo-Json | Set-Content $script:ProgressFile
 }
 
@@ -404,6 +875,31 @@ function Load-Progress {
         } catch {
             Write-Warning "Could not load progress. Starting fresh."
         }
+    }
+}
+
+function Reset-LabProgress {
+    Write-Warning "This will reset all your progress and start fresh."
+    $confirm = Read-Host "Are you sure? (yes/no)"
+    
+    if ($confirm -eq "yes") {
+        # Reset in-memory progress
+        $script:Progress = @{
+            UserName = ""
+            CompletedExercises = @()
+            TotalScore = 0
+        }
+        
+        # Delete progress file
+        if (Test-Path $script:ProgressFile) {
+            Remove-Item $script:ProgressFile -Force
+            Write-Success "Progress file deleted: $script:ProgressFile"
+        }
+        
+        Write-Success "Progress has been reset!"
+        Write-Info "You can now start fresh with any exercise."
+    } else {
+        Write-Info "Reset cancelled."
     }
 }
 
@@ -438,46 +934,28 @@ function Show-ProgressStats {
 function Show-GeneralHelp {
     Show-Header "Help and Documentation"
     
-    Write-Host @"
-TERRAFORM LEARNING LAB - HELP
-
-This interactive lab teaches Terraform through hands-on exercises,
-designed specifically for PowerShell administrators and developers.
-
-HOW IT WORKS:
-1. Select an exercise from the main menu
-2. Follow the guided workflow: init -> plan -> apply -> validate
-3. Get help and hints when stuck
-4. Track your progress as you complete exercises
-
-EXERCISE WORKFLOW:
-• View Files: See the Terraform configuration files
-• Initialize: Run 'terraform init' to set up the working directory  
-• Plan: Run 'terraform plan' to preview changes
-• Apply: Run 'terraform apply' to create resources
-• Show: Run 'terraform show' to inspect current state
-• Validate: Check exercise completion
-
-TERRAFORM vs POWERSHELL:
-• Terraform is declarative (describe what you want)
-• PowerShell is imperative (describe how to do it)
-• Both support variables, conditionals, and loops
-• Both can be version controlled and automated
-
-GETTING HELP:
-• Exercise-specific help is available in the validation step
-• Each exercise includes troubleshooting tips
-• Compare concepts to familiar PowerShell patterns
-
-TIPS FOR SUCCESS:
-• Start with Hello World even if you know Terraform
-• Read the .tf files carefully - they contain examples
-• Don't skip the plan step - it shows what will happen
-• Experiment! You can always destroy and start over
-
-Happy learning!
-
-"@ -ForegroundColor White
+    Write-Host ""
+    Write-Host "TERRAFORM LEARNING LAB - HELP" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "This interactive lab teaches Terraform through hands-on exercises," -ForegroundColor White
+    Write-Host "designed specifically for PowerShell administrators and developers." -ForegroundColor White
+    Write-Host ""
+    Write-Host "HOW IT WORKS:" -ForegroundColor Cyan
+    Write-Host "  1. Select an exercise from the main menu" -ForegroundColor White
+    Write-Host "  2. Choose GUIDED MODE for step-by-step learning" -ForegroundColor White
+    Write-Host "  3. Or manually run: init -> plan -> apply -> validate" -ForegroundColor White
+    Write-Host "  4. Track your progress as you complete exercises" -ForegroundColor White
+    Write-Host ""
+    Write-Host "TERRAFORM vs POWERSHELL:" -ForegroundColor Cyan
+    Write-Host "  * Terraform is declarative (describe what you want)" -ForegroundColor White
+    Write-Host "  * PowerShell is imperative (describe how to do it)" -ForegroundColor White
+    Write-Host "  * Both support variables, conditionals, and loops" -ForegroundColor White
+    Write-Host ""
+    Write-Host "TIPS FOR SUCCESS:" -ForegroundColor Cyan
+    Write-Host "  * Start with Hello World even if you know Terraform" -ForegroundColor White
+    Write-Host "  * Read the .tf files carefully as they contain examples" -ForegroundColor White
+    Write-Host "  * Do not skip the plan step as it shows what will happen" -ForegroundColor White
+    Write-Host ""
     
     Read-Host "Press Enter to continue"
 }
@@ -491,7 +969,7 @@ function Show-MainMenu {
         
         if (-not $script:Progress.UserName) {
             Write-Host "Welcome to the Terraform Learning Lab!" -ForegroundColor Green
-            $name = Read-Host "What's your name?"
+            $name = Read-Host "What is your name?"
             $script:Progress.UserName = $name
             Save-Progress
             Write-Host ""
@@ -507,13 +985,15 @@ function Show-MainMenu {
         foreach ($exerciseId in ($script:Exercises.Keys | Sort-Object)) {
             $exercise = $script:Exercises[$exerciseId]
             $status = if ($script:Progress.CompletedExercises -contains $exerciseId) { "[DONE]" } else { "[TODO]" }
-            $exerciseOptions += "$status $($exercise.Name)"
+            $difficulty = if ($exercise.Difficulty) { "[$($exercise.Difficulty)]" } else { "" }
+            $exerciseOptions += "$status $difficulty $($exercise.Name)"
             $exerciseKeys += $exerciseId
         }
         
         $options = $exerciseOptions + @(
             "View Progress and Statistics",
             "Help and Documentation",
+            "Reset Progress (Start Fresh)",
             "Exit Lab"
         )
         
@@ -528,7 +1008,8 @@ function Show-MainMenu {
             switch ($menuChoice) {
                 0 { Show-ProgressStats }
                 1 { Show-GeneralHelp }
-                2 { 
+                2 { Reset-LabProgress }
+                3 { 
                     Write-Info "Thank you for using the Terraform Learning Lab!"
                     Write-Host "Keep practicing and happy Terraforming!" -ForegroundColor Green
                     return 
@@ -550,6 +1031,11 @@ function Main {
     Load-Progress
     
     # Handle command line parameters
+    if ($ResetProgress) {
+        Reset-LabProgress
+        return
+    }
+    
     if ($ShowStats) {
         Show-ProgressStats
         return

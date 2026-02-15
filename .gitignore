@@ -5,6 +5,13 @@
 user-workspace/
 workspaces/
 *-workspace/
+jefeh-workspace/
+student-workspace/
+temp-workspace/
+# Temporary workspaces created by guided mode
+/tmp/terraform-lab-*
+%TEMP%/terraform-lab-*
+$env:TEMP/terraform-lab-*
 
 # Terraform state and lock files (user-specific)
 *.tfstate
@@ -21,6 +28,7 @@ tfplan
 *.config.json
 .lab-progress/
 .lab-config/
+.terraform-lab-completed
 
 # Local environment files
 .env
@@ -29,9 +37,12 @@ tfplan
 terraform.tfvars
 
 # User-specific output
-terraform-lab-output/
-output/
-test-output/
+**/terraform-lab-output/
+**/output/
+**/test-output/
+
+# Deprecated directories (content moved elsewhere)
+03-openstack/
 
 # Logs
 *.log
