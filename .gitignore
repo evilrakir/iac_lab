@@ -37,16 +37,12 @@ tfplan
 terraform.tfvars
 
 # User-specific output
-terraform-lab-output/
-output/
-test-output/
 **/terraform-lab-output/
 **/output/
 **/test-output/
-# Exercise outputs that shouldn't be committed
-01-basics/*/terraform-lab-output/
-02-providers/*/terraform-lab-output/
-03-modules/*/terraform-lab-output/
+
+# Deprecated directories (content moved elsewhere)
+03-openstack/
 
 # Logs
 *.log
