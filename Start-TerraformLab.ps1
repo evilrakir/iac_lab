@@ -97,30 +97,262 @@ $script:Exercises = @{
         Prerequisites = @("04-state/01-local-state")
         Difficulty = "Advanced"
     }
+    # 03-openstack - OpenStack Labs
     "03-openstack/01-provider-setup" = @{
         Name = "OpenStack Provider Configuration"
         Description = "Configure OpenStack provider and test cloud connectivity"
         Prerequisites = @("02-providers/01-local-provider")
+        Difficulty = "Intermediate"
     }
     "03-openstack/02-basic-vm" = @{
         Name = "OpenStack Virtual Machine Deployment"
         Description = "Deploy your first VM with security groups and SSH access"
         Prerequisites = @("03-openstack/01-provider-setup")
+        Difficulty = "Intermediate"
     }
     "03-openstack/03-networking" = @{
         Name = "Advanced Networking and Security Groups"
         Description = "Create multi-tier network architecture with bastion host"
         Prerequisites = @("03-openstack/02-basic-vm")
+        Difficulty = "Intermediate"
     }
     "03-openstack/04-storage" = @{
         Name = "Storage and Volume Management"
         Description = "Implement persistent storage with monitoring and backups"
         Prerequisites = @("03-openstack/03-networking")
+        Difficulty = "Intermediate"
     }
     "03-openstack/05-load-balancer" = @{
         Name = "Load Balancers and High Availability"
         Description = "Configure load balancing and health checks for web applications"
         Prerequisites = @("03-openstack/04-storage")
+        Difficulty = "Advanced"
+    }
+
+    # 02-providers - Working with Providers (continued)
+    "02-providers/02-aws-basics" = @{
+        Name = "AWS Provider Basics"
+        Description = "Introduction to AWS cloud infrastructure with Terraform"
+        Prerequisites = @("02-providers/01-local-provider")
+        Difficulty = "Intermediate"
+    }
+    "02-providers/03-azure-basics" = @{
+        Name = "Azure Provider Basics"
+        Description = "Deploy Azure resources with Terraform (resource groups, VMs, networking)"
+        Prerequisites = @("02-providers/01-local-provider")
+        Difficulty = "Intermediate"
+    }
+    "02-providers/04-gcp-basics" = @{
+        Name = "GCP Provider Basics"
+        Description = "Google Cloud Platform infrastructure with Terraform"
+        Prerequisites = @("02-providers/01-local-provider")
+        Difficulty = "Intermediate"
+    }
+    "02-providers/05-windows-provider" = @{
+        Name = "Windows-Specific Providers"
+        Description = "Active Directory, DNS, and DHCP management with Terraform"
+        Prerequisites = @("02-providers/01-local-provider")
+        Difficulty = "Advanced"
+    }
+    "02-providers/06-openstack" = @{
+        Name = "OpenStack Provider"
+        Description = "Private cloud infrastructure with the OpenStack provider"
+        Prerequisites = @("02-providers/01-local-provider")
+        Difficulty = "Intermediate"
+    }
+
+    # 03-modules - Reusable Infrastructure (continued)
+    "03-modules/02-module-variables" = @{
+        Name = "Module Input Variables"
+        Description = "Parameterize modules with input variables and validation"
+        Prerequisites = @("03-modules/01-simple-module")
+        Difficulty = "Intermediate"
+    }
+    "03-modules/03-module-sources" = @{
+        Name = "Module Sources"
+        Description = "Load modules from local paths, Git repos, and registries"
+        Prerequisites = @("03-modules/02-module-variables")
+        Difficulty = "Intermediate"
+    }
+    "03-modules/04-module-registry" = @{
+        Name = "Terraform Module Registry"
+        Description = "Use and publish modules from the Terraform Registry"
+        Prerequisites = @("03-modules/03-module-sources")
+        Difficulty = "Intermediate"
+    }
+    "03-modules/05-windows-module" = @{
+        Name = "Windows Infrastructure Modules"
+        Description = "Build reusable modules for Windows infrastructure patterns"
+        Prerequisites = @("03-modules/03-module-sources")
+        Difficulty = "Advanced"
+    }
+
+    # 04-state - State Management (continued)
+    "04-state/02-remote-state" = @{
+        Name = "Remote State Backends"
+        Description = "Configure S3, Azure Storage, and GCS remote state backends"
+        Prerequisites = @("04-state/01-local-state")
+        Difficulty = "Intermediate"
+    }
+    "04-state/03-state-locking" = @{
+        Name = "State Locking and Concurrency"
+        Description = "Prevent concurrent modifications with state locking"
+        Prerequisites = @("04-state/02-remote-state")
+        Difficulty = "Intermediate"
+    }
+    "04-state/04-workspaces" = @{
+        Name = "Terraform Workspaces"
+        Description = "Manage multiple environments with workspaces"
+        Prerequisites = @("04-state/02-remote-state")
+        Difficulty = "Intermediate"
+    }
+    "04-state/05-gitops-workflow" = @{
+        Name = "GitOps Workflow with Terraform"
+        Description = "Implement Git-based infrastructure deployment workflows"
+        Prerequisites = @("04-state/04-workspaces")
+        Difficulty = "Advanced"
+    }
+
+    # 05-best-practices - Production Patterns
+    "05-best-practices/01-project-structure" = @{
+        Name = "Project Structure and Organization"
+        Description = "Organize Terraform projects for maintainability and scale"
+        Prerequisites = @("04-state/01-local-state")
+        Difficulty = "Intermediate"
+    }
+    "05-best-practices/02-naming-conventions" = @{
+        Name = "Resource Naming Conventions"
+        Description = "Establish consistent naming patterns across infrastructure"
+        Prerequisites = @("05-best-practices/01-project-structure")
+        Difficulty = "Intermediate"
+    }
+    "05-best-practices/03-security" = @{
+        Name = "Security Best Practices"
+        Description = "Secure Terraform configurations, secrets management, and IAM"
+        Prerequisites = @("05-best-practices/01-project-structure")
+        Difficulty = "Intermediate"
+    }
+    "05-best-practices/04-cost-optimization" = @{
+        Name = "Cost Optimization Strategies"
+        Description = "Reduce cloud costs with Terraform patterns and Infracost"
+        Prerequisites = @("05-best-practices/01-project-structure")
+        Difficulty = "Intermediate"
+    }
+    "05-best-practices/05-monitoring-integration" = @{
+        Name = "Monitoring and Observability Integration"
+        Description = "Deploy monitoring infrastructure with Terraform (CloudWatch, Datadog, Grafana)"
+        Prerequisites = @("05-best-practices/01-project-structure")
+        Difficulty = "Advanced"
+    }
+
+    # 06-advanced - Advanced Patterns (continued)
+    "06-advanced/01-dynamic-blocks" = @{
+        Name = "Dynamic Blocks"
+        Description = "Generate repeated nested blocks dynamically from data"
+        Prerequisites = @("04-state/01-local-state")
+        Difficulty = "Advanced"
+    }
+    "06-advanced/03-terraform-functions" = @{
+        Name = "Terraform Built-in Functions"
+        Description = "Master string, collection, numeric, and encoding functions"
+        Prerequisites = @("06-advanced/01-dynamic-blocks")
+        Difficulty = "Advanced"
+    }
+    "06-advanced/04-custom-providers" = @{
+        Name = "Custom Terraform Providers"
+        Description = "Understand provider architecture and build custom providers"
+        Prerequisites = @("06-advanced/03-terraform-functions")
+        Difficulty = "Advanced"
+    }
+    "06-advanced/05-powershell-integration" = @{
+        Name = "PowerShell and Terraform Integration"
+        Description = "Deep integration patterns between PowerShell and Terraform"
+        Prerequisites = @("06-advanced/01-dynamic-blocks")
+        Difficulty = "Advanced"
+    }
+
+    # 07-containers - Container Orchestration
+    "07-containers/01-docker-basics" = @{
+        Name = "Docker with Terraform"
+        Description = "Container infrastructure as code with the Docker provider"
+        Prerequisites = @("02-providers/01-local-provider")
+        Difficulty = "Intermediate"
+    }
+    "07-containers/01-docker-provider" = @{
+        Name = "Docker Provider Deep Dive"
+        Description = "Managing containers, networks, and volumes with Terraform"
+        Prerequisites = @("07-containers/01-docker-basics")
+        Difficulty = "Intermediate"
+    }
+    "07-containers/02-kubernetes-basics" = @{
+        Name = "Kubernetes Provider Basics"
+        Description = "Manage Kubernetes resources (deployments, services, config) with Terraform"
+        Prerequisites = @("07-containers/01-docker-provider")
+        Difficulty = "Intermediate"
+    }
+    "07-containers/03-helm-terraform" = @{
+        Name = "Helm Charts with Terraform"
+        Description = "Deploy and manage Helm releases using the Helm provider"
+        Prerequisites = @("07-containers/02-kubernetes-basics")
+        Difficulty = "Advanced"
+    }
+    "07-containers/04-local-k8s" = @{
+        Name = "Local Kubernetes Development"
+        Description = "Set up local K8s clusters (kind, minikube, k3s) with Terraform"
+        Prerequisites = @("07-containers/02-kubernetes-basics")
+        Difficulty = "Intermediate"
+    }
+    "07-containers/05-cloud-k8s" = @{
+        Name = "Cloud Kubernetes (EKS, AKS, GKE)"
+        Description = "Deploy managed Kubernetes on AWS, Azure, and GCP"
+        Prerequisites = @("07-containers/02-kubernetes-basics")
+        Difficulty = "Advanced"
+    }
+
+    # 08-integrations - Tool Integration
+    "08-integrations/01-terraform-ansible" = @{
+        Name = "Terraform + Ansible Integration"
+        Description = "Combine Terraform provisioning with Ansible configuration management"
+        Prerequisites = @("06-advanced/02-conditional-resources")
+        Difficulty = "Intermediate"
+    }
+    "08-integrations/02-docker-compose" = @{
+        Name = "Docker Compose Integration"
+        Description = "Compare and integrate Docker Compose with Terraform workflows"
+        Prerequisites = @("07-containers/01-docker-provider")
+        Difficulty = "Intermediate"
+    }
+    "08-integrations/03-cicd-pipelines" = @{
+        Name = "CI/CD Pipeline Integration"
+        Description = "Run Terraform in GitHub Actions, Azure DevOps, and GitLab pipelines"
+        Prerequisites = @("05-best-practices/01-project-structure")
+        Difficulty = "Advanced"
+    }
+    "08-integrations/04-full-stack" = @{
+        Name = "Full Stack Application Deployment (Capstone)"
+        Description = "End-to-end infrastructure + application deployment bringing everything together"
+        Prerequisites = @("08-integrations/03-cicd-pipelines")
+        Difficulty = "Advanced"
+    }
+
+    # 09-legacy-optional - Legacy Tool Integration
+    "09-legacy-optional/01-vagrant" = @{
+        Name = "Vagrant Provider (Legacy)"
+        Description = "Vagrant integration patterns and migration strategies"
+        Prerequisites = @("02-providers/01-local-provider")
+        Difficulty = "Intermediate"
+    }
+    "09-legacy-optional/02-chef-puppet" = @{
+        Name = "Chef and Puppet Integration (Legacy)"
+        Description = "Integration patterns and migration strategies for Chef/Puppet users"
+        Prerequisites = @("08-integrations/01-terraform-ansible")
+        Difficulty = "Intermediate"
+    }
+    "09-legacy-optional/03-on-premise" = @{
+        Name = "On-Premise Infrastructure (Legacy)"
+        Description = "Managing VMware, Hyper-V, and hybrid infrastructure with Terraform"
+        Prerequisites = @("02-providers/05-windows-provider")
+        Difficulty = "Intermediate"
     }
 }
 
