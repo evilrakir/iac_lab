@@ -85,4 +85,4 @@ my-notes.txt
 !exercises/**/.gitkeep
 !examples/**/*
 !scripts/**/*
-!*.example.tfvars
+!*.example.tfvars.claude/
